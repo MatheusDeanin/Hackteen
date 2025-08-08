@@ -3,4 +3,4 @@
 
 
 
-** Participantes: ** Matheus Jordão [GitHub Pages](https://github.com/MatheusDeanin/).; Matheus Deanin [Perfil]((https://github.com/MatheusDeanin/))
+**Participantes:** [Matheus Jordão](https://github.com/MatheusJordao12/); [Matheus Deanin](https://github.com/MatheusDeanin/).
