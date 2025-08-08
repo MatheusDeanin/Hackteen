@@ -6,4 +6,4 @@
 
 
 
-**Participantes:** [Matheus Jordão](https://github.com/MatheusJordao12/); [Matheus Deanin](https://github.com/MatheusDeanin/); [Julia](); [Lucas]().
+**Participantes:** [Matheus Jordão](https://github.com/MatheusJordao12/); [Matheus Deanin](https://github.com/MatheusDeanin/); [Julia](); [Lucas](https://github.com/LcsGomes-AMS/).
