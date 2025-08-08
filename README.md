@@ -1,5 +1,7 @@
-# Hackteen
-## Projeto Empresa Venturus Campinas-SP
+# Hackteen - Projeto Empresa Venturus Campinas-SP
+---
+Projeto feito pelo os alunos do 1ºAMS - ETEC/FATEC, para o Hackteen.
+---
 
 
 
