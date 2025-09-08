@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Menu Lateral com Fechamento</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+    }
+
+    header {
+      background-color: #2c3e50;
+      color: white;
+      padding: 15px 20px;
+      display: flex;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    #botaoMenu {
+      background-color: #3498db;
+      border: none;
+      color: white;
+      padding: 10px 15px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+
+    #botaoMenu::before {
+      content: "☰ ";
+    }
+
+    /* Sidebar */
+    #sidebar {
+      height: 100%;
+      width: 250px;
+      position: fixed;
+      top: 0;
+      left: -250px;
+      background-color: #34495e;
+      overflow-x: hidden;
+      transition: 0.3s;
+      padding-top: 60px;
+      z-index: 1;
+    }
+
+    #sidebar a {
+      padding: 12px 20px;
+      text-decoration: none;
+      font-size: 18px;
+      color: white;
+      display: block;
+      transition: 0.2s;
+    }
+
+    #sidebar a:hover {
+      background-color: #3e5b76;
+    }
+
+    main {
+      padding: 20px;
+    }
+
+    #sidebar.aberto {
+      left: 0;
+    }
+
+    /* Sobreposição de fundo escura (opcional) */
+    #overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 100%;
+      background-color: rgba(0, 0, 0, 0.3);
+      z-index: 1;
+    }
+
+    #overlay.visivel {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Cabeçalho -->
+  <header>
+    <button id="botaoMenu">Menu</button>
+  </header>
+
+  <!-- Menu lateral -->
+  <nav id="sidebar">
+    <a href="#">Início</a>
+    <a href="#">Sobre</a>
+    <a href="#">Serviços</a>
+    <a href="#">Contato</a>
+    <a href="#">Sair</a>
+  </nav>
+
+  <!-- Sobreposição (invisível até abrir o menu) -->
+  <div id="overlay"></div>
+
+  <!-- Conteúdo -->
+  <main>
+    <h1>Bem-vindo ao site</h1>
+    <p>Este é um exemplo de menu lateral que fecha ao clicar fora dele.</p>
+  </main>
+
+  <!-- Script -->
+  <script>
+    const botaoMenu = document.getElementById('botaoMenu');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('overlay');
+
+    // Abre o menu e mostra o overlay
+    botaoMenu.addEventListener('click', () => {
+      sidebar.classList.add('aberto');
+      overlay.classList.add('visivel');
+    });
+
+    // Fecha o menu ao clicar no overlay
+    overlay.addEventListener('click', () => {
+      sidebar.classList.remove('aberto');
+      overlay.classList.remove('visivel');
+    });
+  </script>
+
+</body>
+</html>
