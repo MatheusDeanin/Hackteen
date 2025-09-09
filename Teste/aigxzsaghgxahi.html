@@ -5,7 +5,6 @@
   <title>Rota da Minha Localização até o Endereço</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <link rel="stylesheet" href="css/style.css">
   <style>
     body { margin: 0; font-family: Arial, sans-serif; }
     #map { height: 85vh; }
@@ -37,7 +36,6 @@
                 <a href="" target="_blank"></a>
                 <a href="" target="_blank"></a>
             </nav>
-              <div id="overlay"></div>
     </header>
     
 <div id="form-container">
@@ -45,30 +43,9 @@
   <button onclick="buscarERotear()">Buscar e Traçar Rota</button>
 </div>
 
-<div id="map" style="z-index: 0;"></div>
+<div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<script>
-    // Aguarda o DOM carregar
-document.addEventListener("DOMContentLoaded", function () {
-    const botaoMenu = document.getElementById("botaoMenu");
-    const sidebar = document.getElementById("sidebar");
-    const overlay = document.getElementById("overlay");
-
-    // Abre ou fecha o menu e mostra ou oculta o overlay
-    botaoMenu.addEventListener("click", function () {
-        sidebar.classList.toggle("aberto");
-        overlay.classList.toggle("visivel");
-    });
-
-    // Fecha o menu ao clicar no overlay
-    overlay.addEventListener("click", function () {
-        sidebar.classList.remove("aberto");
-        overlay.classList.remove("visivel");
-    });
-});
-</script>
 
 <script>
   const map = L.map('map').setView([-23.5505, -46.6333], 13);

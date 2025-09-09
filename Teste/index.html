@@ -133,6 +133,10 @@
       overlay.classList.remove('visivel');
     });
   </script>
-
+    <div id="qrcode"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+      new QRCode(document.getElementById("qrcode"), "https://www.youtube.com/");
+    </script>
 </body>
 </html>

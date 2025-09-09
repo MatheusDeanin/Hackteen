@@ -41,7 +41,7 @@ button {
     background-color: #34495e;
     overflow-x: hidden;
     transition: 0.3s;
-    z-index: 1;
+    z-index: 9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999 !important;
 }
 
 #sidebar h1 {
