@@ -7,6 +7,7 @@
 
 body {
     font-family: 'Montserrat', sans-serif;
+    margin: 0;
 }
 
 header {
@@ -30,6 +31,28 @@ button {
     margin: 5px;
     background-color: #326da8;
     transition: transform 0.5s ease ;
+}
+
+#endereço {
+    margin-left: 5px;
+}
+
+#map {
+    height: 85vh;
+}
+
+#form-container {
+    padding: 10px;
+    background: #f9f9f9;
+}
+
+input, button {
+    padding: 8px;
+    margin-right: 5px;
+}
+
+.Buscar {
+    width: 150px;
 }
 
 #sidebar {

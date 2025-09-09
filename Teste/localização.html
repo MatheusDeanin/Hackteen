@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Localização com JavaScript</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f2f2f2;
+    }
+    #output {
+      margin-top: 20px;
+      padding: 10px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Obter Localização do Dispositivo</h1>
+  <button onclick="getLocation()">📍 Obter Localização</button>
+
+  <div id="output">Clique no botão para obter a localização.</div>
+
+  <script>
+    function getLocation() {
+      const output = document.getElementById("output");
+
+      if (!navigator.geolocation) {
+        output.innerHTML = "Geolocalização não é suportada pelo seu navegador.";
+        return;
+      }
+
+      output.innerHTML = "Obtendo localização...";
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const latitude = position.coords.latitude;
+          const longitude = position.coords.longitude;
+          const accuracy = position.coords.accuracy;
+
+          output.innerHTML = `
+            <strong>Latitude:</strong> ${latitude} <br>
+            <strong>Longitude:</strong> ${longitude} <br>
+            <strong>Precisão:</strong> ${accuracy} metros
+          `;
+        },
+        (error) => {
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              output.innerHTML = "Permissão de localização negada pelo usuário.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              output.innerHTML = "Informações de localização indisponíveis.";
+              break;
+            case error.TIMEOUT:
+              output.innerHTML = "Tempo esgotado ao tentar obter a localização.";
+              break;
+            default:
+              output.innerHTML = "Ocorreu um erro desconhecido.";
+              break;
+          }
+        }
+      );
+    }
+  </script>
+
+</body>
+</html>
