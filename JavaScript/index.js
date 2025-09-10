@@ -149,25 +149,46 @@ if (navigator.geolocation) {
             userMarker = L.marker([userLat, userLon], { icon: airplaneIcon }).addTo(map).bindPopup("Você está aqui").openPopup();
             map.setView([userLat, userLon], 13);
         } else {
-            // Se o marcador já existe, atualiza a posição e adiciona o ponto à rota
-            userMarker.setLatLng([userLat, userLon]);
-            if (rotaLayer) {
-                // pega todos os pontos da rota azul
-                let pontosRota = [];
-                rotaLayer.eachLayer(layer => {
-                    if (layer instanceof L.Polyline) {
-                        pontosRota = pontosRota.concat(layer.getLatLngs());
-                    }
-                });
+            // Atualiza posição do usuário
+userMarker.setLatLng([userLat, userLon]);
 
-                // encontra o ponto da rota mais próximo do usuário
-                const proximoPonto = encontrarProximoPontoNaRota(userLatLng, pontosRota);
+if (rotaLayer) {
+    // Coleta todos os pontos da rota azul
+    let pontosRota = [];
+    rotaLayer.eachLayer(layer => {
+        if (layer instanceof L.Polyline) {
+            pontosRota = pontosRota.concat(layer.getLatLngs());
+        }
+    });
 
-                // se estiver a menos de 30m da rota, adiciona ao traço cinza
-                if (proximoPonto && calcularDistancia(userLat, userLon, proximoPonto.lat, proximoPonto.lng) < 30) {
-                    userPath.addLatLng(userLatLng);
-                }
+    // Encontra o ponto mais próximo da rota
+    const proximoPonto = encontrarProximoPontoNaRota(userLatLng, pontosRota);
+    const distanciaAteRota = proximoPonto
+        ? calcularDistancia(userLat, userLon, proximoPonto.lat, proximoPonto.lng)
+        : Infinity;
+
+    // Se estiver perto da rota (<30m), adiciona ao caminho
+    if (distanciaAteRota < 30) {
+        const ultimoPonto = userPath.getLatLngs().slice(-1)[0];
+        if (!ultimoPonto) {
+            // Primeiro ponto válido na rota
+            userPath.addLatLng(userLatLng);
+        } else {
+            const distUltimo = calcularDistancia(
+                ultimoPonto.lat,
+                ultimoPonto.lng,
+                userLat,
+                userLon
+            );
+
+            // Evita saltos grandes (teleporte / erro GPS)
+            if (distUltimo < 100) {
+                userPath.addLatLng(userLatLng);
             }
+        }
+    }
+}
+
 
             // Lógica de recalculo: se uma rota existe e o usuário está fora dela
             if (rotaLayer && !isUserOnRoute(userLatLng, rotaLayer)) {
