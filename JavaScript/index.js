@@ -155,6 +155,7 @@ function coletarPontosDaRota() {
 }
 
 // Começar a monitorar a posição do usuário assim que carregar a página
+// Começar a monitorar a posição do usuário assim que carregar a página
 if (navigator.geolocation) {
     showloadscreen();
 
@@ -169,74 +170,38 @@ if (navigator.geolocation) {
             userMarker = L.marker([userLat, userLon], { icon: airplaneIcon }).addTo(map).bindPopup("Você está aqui").openPopup();
             map.setView([userLat, userLon], 13);
         } else {
-            // Atualiza posição do usuário
+            // Atualiza a posição do marcador do usuário
             userMarker.setLatLng([userLat, userLon]);
-
-            // Lógica MAIS ROBUSTA para só desenhar userPath quando estiver realmente sobre a rota
+            
+            // Lógica para navegação e desenho do caminho do usuário
             if (rotaPolyline) {
-                try {
-                    // converte latlng do GPS para ponto em pixels no layer
-                    const layerPoint = map.latLngToLayerPoint(userLatLng);
+                // Tenta encontrar o ponto mais próximo na rota azul com alta precisão
+                const layerPoint = map.latLngToLayerPoint(userLatLng);
+                const closest = rotaPolyline.closestLayerPoint ? rotaPolyline.closestLayerPoint(layerPoint) : null;
+                
+                let pontoParaAdicionar = null;
 
-                    // tenta usar closestLayerPoint (método do PolylineRenderer) para precisão em px
-                    const closest = rotaPolyline.closestLayerPoint ? rotaPolyline.closestLayerPoint(layerPoint) : null;
-
-                    let pontoParaAdicionar = null;
-                    if (closest && typeof closest.distance === 'number') {
-                        // closest.distance está em pixels
-                        const pxThreshold = 10; // tolerância em pixels (ajuste se quiser)
-                        if (closest.distance <= pxThreshold) {
-                            // transforma de volta para latlng o ponto mais próximo na linha
-                            const closestLatLng = map.layerPointToLatLng(closest);
-                            pontoParaAdicionar = closestLatLng;
-                        }
-                    }
-
-                    // fallback: usa a busca por vértices (em metros) se closest não estiver disponível
-                    if (!pontoParaAdicionar) {
-                        const pontos = coletarPontosDaRota();
-                        const proximoP = encontrarProximoPontoNaRota(userLatLng, pontos);
-                        if (proximoP) {
-                            const distanciaAteRota = calcularDistancia(userLat, userLon, proximoP.lat, proximoP.lng);
-                            if (distanciaAteRota < 30) { // 30m tolerância
-                                pontoParaAdicionar = proximoP;
-                            }
-                        }
-                    }
-
-                    // Só adiciona ao caminho cinza se tiver um ponto válido e não for salto grande
-                    if (pontoParaAdicionar) {
-                        const ultimoPonto = userPath.getLatLngs().slice(-1)[0];
-                        if (!ultimoPonto) {
-                            userPath.addLatLng(pontoParaAdicionar);
-                        } else {
-                            const distUltimo = calcularDistancia(
-                                ultimoPonto.lat,
-                                ultimoPonto.lng,
-                                pontoParaAdicionar.lat,
-                                pontoParaAdicionar.lng
-                            );
-                            // evita saltos grandes (teleporte/erro)
-                            if (distUltimo < 100) { // 100m salto máximo permitido
-                                userPath.addLatLng(pontoParaAdicionar);
-                            }
-                        }
-                    }
-                } catch (e) {
-                    // se qualquer erro acontecer na tentativa com closestLayerPoint, faz o fallback simples
+                if (closest && closest.distance <= 15) { // Tolerância de 15 pixels
+                    // Se estiver dentro da tolerância, usa o ponto na rota azul
+                    pontoParaAdicionar = map.layerPointToLatLng(closest);
+                } else {
+                    // Fallback: se não estiver perto o suficiente (ou closest não funcionar), usa o método de distância em metros
                     const pontos = coletarPontosDaRota();
                     const proximoP = encontrarProximoPontoNaRota(userLatLng, pontos);
-                    if (proximoP) {
-                        const distanciaAteRota = calcularDistancia(userLat, userLon, proximoP.lat, proximoP.lng);
-                        if (distanciaAteRota < 30) {
-                            const ultimoPonto = userPath.getLatLngs().slice(-1)[0];
-                            if (!ultimoPonto || calcularDistancia(ultimoPonto.lat, ultimoPonto.lng, proximoP.lat, proximoP.lng) < 100) {
-                                userPath.addLatLng(proximoP);
-                            }
-                        }
+                    
+                    if (proximoP && calcularDistancia(userLat, userLon, proximoP.lat, proximoP.lng) < 30) { // Tolerância de 30m
+                         pontoParaAdicionar = proximoP;
                     }
                 }
-            } // fim rotaPolyline
+                
+                // Se um ponto válido na rota azul foi encontrado, adicione-o à linha cinza
+                if (pontoParaAdicionar) {
+                    const ultimoPonto = userPath.getLatLngs().slice(-1)[0];
+                    if (!ultimoPonto || calcularDistancia(ultimoPonto.lat, ultimoPonto.lng, pontoParaAdicionar.lat, pontoParaAdicionar.lng) < 100) {
+                        userPath.addLatLng(pontoParaAdicionar);
+                    }
+                }
+            } // Fim da lógica para a linha cinza
 
             // Lógica de recalculo: se uma rota existe e o usuário está fora dela
             if (rotaLayer && !isUserOnRoute(userLatLng, rotaLayer)) {
@@ -244,12 +209,9 @@ if (navigator.geolocation) {
                     recalculando = true;
                     alert("Você se desviou da rota. Recalculando...");
                     buscarERotear(destinoGlobal);
-                    // opcional: timeout de segurança (caso algo dê errado)
                     setTimeout(() => {
-                        // não forçar aqui a liberação se a rota ainda não foi carregada, mas
-                        // mantém como "fallback" caso a função fetch trave
                         recalculando = false;
-                    }, 15000); // 15s fallback
+                    }, 15000);
                 }
             }
 
@@ -350,7 +312,7 @@ function buscarERotear(destino) {
         fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
             method: 'POST',
             headers: {
-                'Authorization': 'SUA_KEY_AQUI', // replace com sua key
+                'Authorization': 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0=', // replace com sua key
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -413,4 +375,3 @@ function buscarERotear(destino) {
         recalculando = false;
     });
 }
-    
