@@ -151,9 +151,24 @@ if (navigator.geolocation) {
         } else {
             // Se o marcador já existe, atualiza a posição e adiciona o ponto à rota
             userMarker.setLatLng([userLat, userLon]);
-            if (rotaLayer && isUserOnRoute(userLatLng, rotaLayer)) {
-                userPath.addLatLng([userLat, userLon]);
+            if (rotaLayer) {
+                // pega todos os pontos da rota azul
+                let pontosRota = [];
+                rotaLayer.eachLayer(layer => {
+                    if (layer instanceof L.Polyline) {
+                        pontosRota = pontosRota.concat(layer.getLatLngs());
+                    }
+                });
+
+                // encontra o ponto da rota mais próximo do usuário
+                const proximoPonto = encontrarProximoPontoNaRota(userLatLng, pontosRota);
+
+                // se estiver a menos de 30m da rota, adiciona ao traço cinza
+                if (proximoPonto && calcularDistancia(userLat, userLon, proximoPonto.lat, proximoPonto.lng) < 30) {
+                    userPath.addLatLng(userLatLng);
+                }
             }
+
             // Lógica de recalculo: se uma rota existe e o usuário está fora dela
             if (rotaLayer && !isUserOnRoute(userLatLng, rotaLayer)) {
                 alert("Você se desviou da rota. Recalculando...");
