@@ -1,20 +1,19 @@
 // Barra lateral
-// Aguarda o DOM carregar
-document.addEventListener("DOMContentLoaded", function () {
-    const botaoMenu = document.getElementById("botaoMenu");
-    const sidebar = document.getElementById("sidebar");
-    const overlay = document.getElementById("overlay");
+document.addEventListener("DOMContentLoaded", function () { // Carrega  o DOM
+    const botaoMenu = document.getElementById("botaoMenu"); // Botão menu, localizado no canto superior esquerdo
+    const sidebar = document.getElementById("sidebar"); // Barra lateral
+    const overlay = document.getElementById("overlay"); // Adicionado para poder fechar a barra lateral
 
     // Abre ou fecha o menu e mostra ou oculta o overlay
     botaoMenu.addEventListener("click", function () {
-        sidebar.classList.toggle("aberto");
-        overlay.classList.toggle("visivel");
+        sidebar.classList.toggle("aberto"); // Aparece o menu
+        overlay.classList.toggle("visivel"); // Aparece o overlay
     });
 
     // Fecha o menu ao clicar no overlay
-    overlay.addEventListener("click", function () {
-        sidebar.classList.remove("aberto");
-        overlay.classList.remove("visivel");
+    overlay.addEventListener("click", function () { // Detecta o click
+        sidebar.classList.remove("aberto"); // Remove quando clicado no overlay
+        overlay.classList.remove("visivel"); // Esconde o overlay
     });
 });
 
@@ -136,6 +135,7 @@ function calcularRumo(lat1, lon1, lat2, lon2) {
 }
 
 // Começar a monitorar a posição do usuário assim que carregar a página
+// Começar a monitorar a posição do usuário assim que carregar a página
 if (navigator.geolocation) {
     showloadscreen();
 
@@ -146,10 +146,13 @@ if (navigator.geolocation) {
 
         if (!userMarker) {
             hideload();
+            // Cria o marcador na primeira posição encontrada
             userMarker = L.marker([userLat, userLon], { icon: airplaneIcon }).addTo(map).bindPopup("Você está aqui").openPopup();
             map.setView([userLat, userLon], 13);
         } else {
+            // Se o marcador já existe, atualiza a posição e adiciona o ponto à rota
             userMarker.setLatLng([userLat, userLon]);
+            userPath.addLatLng([userLat, userLon]); // <--- AQUI: a rota é desenhada apenas na atualização
             
             // Lógica de recalculo: se uma rota existe e o usuário está fora dela
             if (rotaLayer && !isUserOnRoute(userLatLng, rotaLayer)) {
@@ -188,8 +191,6 @@ if (navigator.geolocation) {
                 }
             }
         }
-        
-        userPath.addLatLng([userLat, userLon]);
 
     }, erro => {
         alert("Não foi possível obter sua localização.");
