@@ -151,8 +151,9 @@ if (navigator.geolocation) {
         } else {
             // Se o marcador já existe, atualiza a posição e adiciona o ponto à rota
             userMarker.setLatLng([userLat, userLon]);
-            userPath.addLatLng([userLat, userLon]); // <--- AQUI: A rota só é desenhada nas atualizações
-            
+            if (rotaLayer && isUserOnRoute(userLatLng, rotaLayer)) {
+                userPath.addLatLng([userLat, userLon]);
+            }
             // Lógica de recalculo: se uma rota existe e o usuário está fora dela
             if (rotaLayer && !isUserOnRoute(userLatLng, rotaLayer)) {
                 alert("Você se desviou da rota. Recalculando...");
@@ -207,6 +208,15 @@ if (navigator.geolocation) {
 
 // Função principal para buscar e traçar a rota
 function buscarERotear(destino) {
+    if (rotaLayer) {
+    map.removeLayer(rotaLayer);
+    }
+
+    // Reinicia o caminho do usuário
+    if (userPath) {
+        map.removeLayer(userPath);
+    }
+    userPath = L.polyline([], {color: 'gray', weight: 4}).addTo(map);
     const endereco = destino || document.getElementById("endereco").value;
     if (!endereco) {
         alert("Digite um endereço.");
