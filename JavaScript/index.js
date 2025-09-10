@@ -50,7 +50,8 @@ const airplaneIcon = L.icon({
 
 let userMarker;
 let watchId;
-let rotaLayer;
+let rotaLayer;          // camada GeoJSON inteira
+let rotaPolyline = null; // referência para o polyline real (usado no closestLayerPoint)
 let destinoGlobal;
 let instrucoesRota = []; 
 let proximaInstrucaoIndex = 0;
@@ -79,7 +80,7 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
     return raioTerra * c;
 }
 
-// Verifica se a posição do usuário está próxima da rota
+// Verifica se a posição do usuário está próxima da rota (tolerância em metros)
 function isUserOnRoute(userLatLng, rotaLayer) {
     if (!rotaLayer) {
         return false;
@@ -108,7 +109,7 @@ function isUserOnRoute(userLatLng, rotaLayer) {
     return estaNaRota;
 }
 
-// Encontra o ponto da rota mais próximo da posição do usuário
+// Encontra o ponto da rota mais próximo da posição do usuário (fallback por vértices)
 function encontrarProximoPontoNaRota(userLatLng, rotaPoints) {
     let proximoPonto = null;
     let menorDistancia = Infinity;
@@ -135,6 +136,24 @@ function calcularRumo(lat1, lon1, lat2, lon2) {
     return rumo;
 }
 
+// Helper: pega todos os pontos (LatLng) da rota (concat dos polylines dentro do rotaLayer)
+function coletarPontosDaRota() {
+    let pontosRota = [];
+    if (!rotaLayer) return pontosRota;
+    rotaLayer.eachLayer(layer => {
+        if (layer instanceof L.Polyline) {
+            const latlngs = layer.getLatLngs();
+            // se for array de arrays (multi), faz flatten simples:
+            if (Array.isArray(latlngs[0])) {
+                latlngs.forEach(sub => pontosRota = pontosRota.concat(sub));
+            } else {
+                pontosRota = pontosRota.concat(latlngs);
+            }
+        }
+    });
+    return pontosRota;
+}
+
 // Começar a monitorar a posição do usuário assim que carregar a página
 if (navigator.geolocation) {
     showloadscreen();
@@ -151,45 +170,73 @@ if (navigator.geolocation) {
             map.setView([userLat, userLon], 13);
         } else {
             // Atualiza posição do usuário
-userMarker.setLatLng([userLat, userLon]);
+            userMarker.setLatLng([userLat, userLon]);
 
-if (rotaLayer) {
-    // Coleta todos os pontos da rota azul
-    let pontosRota = [];
-    rotaLayer.eachLayer(layer => {
-        if (layer instanceof L.Polyline) {
-            pontosRota = pontosRota.concat(layer.getLatLngs());
-        }
-    });
+            // Lógica MAIS ROBUSTA para só desenhar userPath quando estiver realmente sobre a rota
+            if (rotaPolyline) {
+                try {
+                    // converte latlng do GPS para ponto em pixels no layer
+                    const layerPoint = map.latLngToLayerPoint(userLatLng);
 
-    // Encontra o ponto mais próximo da rota
-    const proximoPonto = encontrarProximoPontoNaRota(userLatLng, pontosRota);
-    const distanciaAteRota = proximoPonto
-        ? calcularDistancia(userLat, userLon, proximoPonto.lat, proximoPonto.lng)
-        : Infinity;
+                    // tenta usar closestLayerPoint (método do PolylineRenderer) para precisão em px
+                    const closest = rotaPolyline.closestLayerPoint ? rotaPolyline.closestLayerPoint(layerPoint) : null;
 
-    // Se estiver perto da rota (<30m), adiciona ao caminho
-    if (distanciaAteRota < 30) {
-        const ultimoPonto = userPath.getLatLngs().slice(-1)[0];
-        if (!ultimoPonto) {
-            // Primeiro ponto válido na rota
-            userPath.addLatLng(userLatLng);
-        } else {
-            const distUltimo = calcularDistancia(
-                ultimoPonto.lat,
-                ultimoPonto.lng,
-                userLat,
-                userLon
-            );
+                    let pontoParaAdicionar = null;
+                    if (closest && typeof closest.distance === 'number') {
+                        // closest.distance está em pixels
+                        const pxThreshold = 10; // tolerância em pixels (ajuste se quiser)
+                        if (closest.distance <= pxThreshold) {
+                            // transforma de volta para latlng o ponto mais próximo na linha
+                            const closestLatLng = map.layerPointToLatLng(closest);
+                            pontoParaAdicionar = closestLatLng;
+                        }
+                    }
 
-            // Evita saltos grandes (teleporte / erro GPS)
-            if (distUltimo < 100) {
-                userPath.addLatLng(userLatLng);
-            }
-        }
-    }
-}
+                    // fallback: usa a busca por vértices (em metros) se closest não estiver disponível
+                    if (!pontoParaAdicionar) {
+                        const pontos = coletarPontosDaRota();
+                        const proximoP = encontrarProximoPontoNaRota(userLatLng, pontos);
+                        if (proximoP) {
+                            const distanciaAteRota = calcularDistancia(userLat, userLon, proximoP.lat, proximoP.lng);
+                            if (distanciaAteRota < 30) { // 30m tolerância
+                                pontoParaAdicionar = proximoP;
+                            }
+                        }
+                    }
 
+                    // Só adiciona ao caminho cinza se tiver um ponto válido e não for salto grande
+                    if (pontoParaAdicionar) {
+                        const ultimoPonto = userPath.getLatLngs().slice(-1)[0];
+                        if (!ultimoPonto) {
+                            userPath.addLatLng(pontoParaAdicionar);
+                        } else {
+                            const distUltimo = calcularDistancia(
+                                ultimoPonto.lat,
+                                ultimoPonto.lng,
+                                pontoParaAdicionar.lat,
+                                pontoParaAdicionar.lng
+                            );
+                            // evita saltos grandes (teleporte/erro)
+                            if (distUltimo < 100) { // 100m salto máximo permitido
+                                userPath.addLatLng(pontoParaAdicionar);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // se qualquer erro acontecer na tentativa com closestLayerPoint, faz o fallback simples
+                    const pontos = coletarPontosDaRota();
+                    const proximoP = encontrarProximoPontoNaRota(userLatLng, pontos);
+                    if (proximoP) {
+                        const distanciaAteRota = calcularDistancia(userLat, userLon, proximoP.lat, proximoP.lng);
+                        if (distanciaAteRota < 30) {
+                            const ultimoPonto = userPath.getLatLngs().slice(-1)[0];
+                            if (!ultimoPonto || calcularDistancia(ultimoPonto.lat, ultimoPonto.lng, proximoP.lat, proximoP.lng) < 100) {
+                                userPath.addLatLng(proximoP);
+                            }
+                        }
+                    }
+                }
+            } // fim rotaPolyline
 
             // Lógica de recalculo: se uma rota existe e o usuário está fora dela
             if (rotaLayer && !isUserOnRoute(userLatLng, rotaLayer)) {
@@ -197,11 +244,12 @@ if (rotaLayer) {
                     recalculando = true;
                     alert("Você se desviou da rota. Recalculando...");
                     buscarERotear(destinoGlobal);
-
-                    // Depois de um tempo libera de novo
+                    // opcional: timeout de segurança (caso algo dê errado)
                     setTimeout(() => {
+                        // não forçar aqui a liberação se a rota ainda não foi carregada, mas
+                        // mantém como "fallback" caso a função fetch trave
                         recalculando = false;
-                    }, 10000); // 10 segundos de "resfriamento"
+                    }, 15000); // 15s fallback
                 }
             }
 
@@ -254,7 +302,9 @@ if (rotaLayer) {
 // Função principal para buscar e traçar a rota
 function buscarERotear(destino) {
     if (rotaLayer) {
-    map.removeLayer(rotaLayer);
+        map.removeLayer(rotaLayer);
+        rotaLayer = null;
+        rotaPolyline = null;
     }
 
     // Reinicia o caminho do usuário
@@ -265,11 +315,13 @@ function buscarERotear(destino) {
     const endereco = destino || document.getElementById("endereco").value;
     if (!endereco) {
         alert("Digite um endereço.");
+        recalculando = false;
         return;
     }
     destinoGlobal = endereco;
     if (!userMarker) {
         alert("Aguardando localização do usuário...");
+        recalculando = false;
         return;
     }
 
@@ -288,6 +340,7 @@ function buscarERotear(destino) {
         if (data.length === 0) {
             alert("Endereço não encontrado.");
             hideload();
+            recalculando = false;
             return;
         }
 
@@ -297,7 +350,7 @@ function buscarERotear(destino) {
         fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
             method: 'POST',
             headers: {
-                'Authorization': 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjY4NmNhMDAxOGQ1ZjQwZWU4ZWE1OWZkNjEwMGM2ZmNiIiwiaCI6Im11cm11cjY0In0=',
+                'Authorization': 'SUA_KEY_AQUI', // replace com sua key
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -309,33 +362,55 @@ function buscarERotear(destino) {
         })
         .then(res => res.json())
         .then(routeData => {
-            recalculando = false;
+            // remove camada antiga (já removemos antes, mas garantir)
             if (rotaLayer) {
                 map.removeLayer(rotaLayer);
+                rotaLayer = null;
+                rotaPolyline = null;
             }
 
+            // adiciona a nova rota (geojson)
             rotaLayer = L.geoJSON(routeData, {
                 style: { color: 'blue', weight: 5 }
             }).addTo(map);
 
+            // extrai o primeiro polyline real para usar closestLayerPoint
+            rotaPolyline = null;
+            rotaLayer.eachLayer(layer => {
+                // pega o primeiro Polyline que encontrar
+                if (!rotaPolyline && layer instanceof L.Polyline) {
+                    rotaPolyline = layer;
+                }
+            });
+
             map.fitBounds(rotaLayer.getBounds());
             
             // Armazena as instruções da rota
-            instrucoesRota = routeData.features[0].properties.segments[0].steps;
+            try {
+                instrucoesRota = routeData.features[0].properties.segments[0].steps || [];
+            } catch (e) {
+                instrucoesRota = [];
+            }
             proximaInstrucaoIndex = 0; // Reinicia o contador para a nova rota
             
             L.marker([destLat, destLon]).addTo(map).bindPopup("Destino").openPopup();
             hideload();
+
+            // Libera novamente o recálculo: rota já carregada
+            recalculando = false;
         })
         .catch(err => {
             console.error("Erro na rota:", err);
             alert("Erro ao traçar a rota.");
             hideload();
+            recalculando = false;
         });
     })
     .catch(err => {
         console.error("Erro na busca de endereço:", err);
         alert("Erro ao buscar endereço.");
         hideload();
+        recalculando = false;
     });
 }
+    
