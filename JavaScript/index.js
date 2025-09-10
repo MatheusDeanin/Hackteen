@@ -135,7 +135,6 @@ function calcularRumo(lat1, lon1, lat2, lon2) {
 }
 
 // Começar a monitorar a posição do usuário assim que carregar a página
-// Começar a monitorar a posição do usuário assim que carregar a página
 if (navigator.geolocation) {
     showloadscreen();
 
@@ -152,7 +151,7 @@ if (navigator.geolocation) {
         } else {
             // Se o marcador já existe, atualiza a posição e adiciona o ponto à rota
             userMarker.setLatLng([userLat, userLon]);
-            userPath.addLatLng([userLat, userLon]); // <--- AQUI: a rota é desenhada apenas na atualização
+            userPath.addLatLng([userLat, userLon]); // <--- AQUI: A rota só é desenhada nas atualizações
             
             // Lógica de recalculo: se uma rota existe e o usuário está fora dela
             if (rotaLayer && !isUserOnRoute(userLatLng, rotaLayer)) {
