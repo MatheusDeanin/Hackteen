@@ -37,6 +37,68 @@ button {
     margin-left: 5px;
 }
 
+#tela-carregamento {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #374b5e50;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 999999;
+}
+
+#tela-carregamento.esconder {
+    display: none;
+}
+
+/* Estilo para a caixa de sugestão */
+#sugestao-virada {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: #34495e;
+    color: white;
+    padding: 15px 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    font-weight: bold;
+    text-align: center;
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* A classe 'esconder' que já existe será usada para esconder a caixa */
+#sugestao-virada.esconder {
+    display: none;
+    opacity: 0;
+}
+
+/* Estilização para o spinner (agora dentro do #tela-carregamento) */
+.spinner {
+    border: 6px solid #f3f3f3;
+    border-top: 6px solid #3498db;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+}
+
+/* O texto "Carregando..." */
+#tela-carregamento p {
+    color: #fff;
+    font-size: 1.2em;
+    margin-top: 15px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
 #map {
     height: 85vh;
 }

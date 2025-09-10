@@ -2,7 +2,7 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8">
-    <title>Rota da Minha Localização até o Endereço</title>
+    <title>DriveGood</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="css/style.css">
@@ -32,12 +32,15 @@
       <input type="text" id="endereco" placeholder="Digite um endereço..." />
       <button class="Buscar" onclick="buscarERotear()">Buscar e Traçar Rota</button>
     </div>
-    
+    <div id="tela-carregamento" class="esconder">
+      <div class="spinner"></div> <p>Carregando...</p>
+    </div>
+    <div id="sugestao-virada" class="esconder">
+      <p id="texto-sugestao"></p>
+    </div>
     <div id="map" style="z-index: 0;"></div>
     
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    
-    <script src="JavaScript/index.js"></script>
     
     <script src="JavaScript/index.js"></script>
 
