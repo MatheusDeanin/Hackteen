@@ -312,7 +312,7 @@ function buscarERotear(destino) {
         fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
             method: 'POST',
             headers: {
-                'Authorization': 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0=', // replace com sua key
+                'Authorization': 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0=',
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
