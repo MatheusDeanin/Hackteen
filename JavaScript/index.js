@@ -48,13 +48,13 @@ const airplaneIcon = L.icon({
     iconAnchor: [16, 16]
 });
 
-let recalculando = false;
 let userMarker;
 let watchId;
 let rotaLayer;
 let destinoGlobal;
-let instrucoesRota = []; // Variável para armazenar as instruções da rota
-let proximaInstrucaoIndex = 0; // Índice da próxima instrução
+let instrucoesRota = []; 
+let proximaInstrucaoIndex = 0;
+let recalculando = false;
 
 const map = L.map('map').setView([-23.5505, -46.6333], 13);
 let userPath = L.polyline([], {color: 'gray', weight: 4}).addTo(map);
@@ -309,6 +309,7 @@ function buscarERotear(destino) {
         })
         .then(res => res.json())
         .then(routeData => {
+            recalculando = false;
             if (rotaLayer) {
                 map.removeLayer(rotaLayer);
             }
