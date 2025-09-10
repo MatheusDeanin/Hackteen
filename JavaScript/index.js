@@ -48,6 +48,7 @@ const airplaneIcon = L.icon({
     iconAnchor: [16, 16]
 });
 
+let recalculando = false;
 let userMarker;
 let watchId;
 let rotaLayer;
@@ -192,8 +193,16 @@ if (rotaLayer) {
 
             // Lógica de recalculo: se uma rota existe e o usuário está fora dela
             if (rotaLayer && !isUserOnRoute(userLatLng, rotaLayer)) {
-                alert("Você se desviou da rota. Recalculando...");
-                buscarERotear(destinoGlobal); 
+                if (!recalculando) { // só entra se não estiver recalculando
+                    recalculando = true;
+                    alert("Você se desviou da rota. Recalculando...");
+                    buscarERotear(destinoGlobal);
+
+                    // Depois de um tempo libera de novo
+                    setTimeout(() => {
+                        recalculando = false;
+                    }, 10000); // 10 segundos de "resfriamento"
+                }
             }
 
             // Lógica para navegação em tempo real (instruções de virada)
