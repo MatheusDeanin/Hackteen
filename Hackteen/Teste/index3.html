@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Teste Mapa OSM com Leaflet</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map {
+      height: 400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Mapa simples OpenStreetMap + Leaflet</h2>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+  const map = L.map('map').setView([-22.3145, -49.0609], 13);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19,
+  }).addTo(map);
+
+  L.marker([-22.3145, -49.0609]).addTo(map)
+    .bindPopup('São Paulo')
+    .openPopup();
+</script>
+  <div id="map"></div>
+    <script src="JavaScript/Mapa.js"></script>
+    <script src="JavaScript/index.js"></script>
+    
+    <header>
+            <button id="botaoMenu">☰ Menu</button>
+            <div class="textomenu">
+                <a href="#">Início</a>
+                <a>•</a>
+                <a href="#">Sobre</a>
+                <a>•</a>
+                <a href="#">GitHUB</a>
+                <a>•</a>
+                <a href="#">Contato</a>
+            </div>
+            <nav id="sidebar">
+                <h1>Sites</h1>
+                <a href="" target="_blank"></a>
+                <a href="" target="_blank"></a>
+                <a href="" target="_blank"></a>
+            </nav>
+    </header>
+    <div id="overlay"></div>
+    <script>document.addEventListener("DOMContentLoaded", function () {
+    const botaoMenu = document.getElementById("botaoMenu");
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("overlay");
+
+    // Abre ou fecha o menu e mostra ou oculta o overlay
+    botaoMenu.addEventListener("click", function () {
+        sidebar.classList.toggle("aberto");
+        overlay.classList.toggle("visivel");
+    });
+
+    // Fecha o menu ao clicar no overlay
+    overlay.addEventListener("click", function () {
+        sidebar.classList.remove("aberto");
+        overlay.classList.remove("visivel");
+    });
+});</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8">
+    <title>DriveGood</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" href="./imagens/Logo1.png">
+  </head>
+  <body>
+    <header>
+      <button id="botaoMenu">☰ Menu</button>
+      <div id="form-container">
+        <input type="text" id="endereco" placeholder="Digite um endereço..." />
+        <button class="Buscar" onclick="adicionarEndereco()">Buscar e Traçar Rota</button>
+        </div>
+        <div id="tela-carregamento" class="esconder">
+          <div class="spinner"></div> <p>Carregando...</p>
+        </div>
+        <div id="sugestao-virada" class="esconder">
+        <p id="texto-sugestao"></p>
+    </div>
+      <div class="textomenu">
+        <a href="#">Início</a>
+        <a>•</a>
+        <a href="">Sobre</a>
+        <a>•</a>
+        <a href="github.html">GitHUB</a>
+        <a>•</a>
+        <a href="contato.html">Contato</a>
+      </div>
+      <nav id="sidebar">
+        <h1>Configurações</h1>
+        <a href="" target="_blank"></a>
+        <a href="" target="_blank"></a>
+        <a href="" target="_blank"></a>
+      </nav>
+      <div id="overlay"></div>
+    </header>
+    <div id="map" style="z-index: 0;"></div>
+    
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    
+    <script src="JavaScript/index.js"></script>
+
+</body>
+</html>
