@@ -1,0 +1,28 @@
+Mapear pontos manualmente.
+Traçar a rota conforme os pontos marcados na api
+gera o link para  arquivo do motorista
+o link é gerado um QRCODE
+Salva o QRCODE como imagem na maquina
+Envia o QRCODE  ou o Link para o motorista
+Ele Acessa e ve a rota
+
+
+
+Crie um arquivo html para o patrão marcar a rota
+
+assim que ele marcar terá um botão para gerar o QRCODE
+
+dar a opção de salvar o qrcode como imagem ou enviar o link via whats app
+
+O motorista le o QRCODE ou clica na URL
+
+ai o arquivo ver ver.html que le as variavies de rotas e calcula a rota na api
+
+
+exemplo de URL
+
+https://matheusdeanin.github.io/Hackteen/ver.html?a=5465465|87987987&b=545487987|5465465465
+
+
+
+
