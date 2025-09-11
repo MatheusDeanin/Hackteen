@@ -2,11 +2,14 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8">
-    <title>DriveGood</title>
+    <title>DriveGood - Mapa</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="css/style.css">
-    <link rel="icon" href="./imagens/Logo1.png">
+    <link rel="icon" href="./imagens/logo.png">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   </head>
   <body>
     <header>
@@ -22,9 +25,9 @@
         <p id="texto-sugestao"></p>
     </div>
       <div class="textomenu">
-        <a href="#">Início</a>
+        <a href="paginainicial.html">Página Inicial</a>
         <a>•</a>
-        <a href="">Sobre</a>
+        <a href="#">Mapa</a>
         <a>•</a>
         <a href="github.html">GitHUB</a>
         <a>•</a>
@@ -43,6 +46,19 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     
     <script src="JavaScript/index.js"></script>
+
+        <div id="qrcode-container" class="esconder">
+        <button id="qrcode-expander">QR</button>
+        <div id="qrcode-content" class="esconder">
+            <h3>Compartilhe sua rota</h3>
+            <div id="qrcode"></div>
+            <button id="fechar-qrcode">Fechar</button>
+        </div>
+    </div>
+
+    <div id="sugestao-virada" class="sugestao">
+      <span id="texto-sugestao">Aguardando rota...</span>
+    </div>
 
 </body>
 </html>

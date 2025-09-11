@@ -1,18 +1,47 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+* {
+    margin: 0;
+    padding: 0;
+}
+
 body{
-    background-color: black;
+    background-color: rgb(255, 255, 255);
     text-align: center;
     font-family: 'Montserrat', sans-serif;
-    font-size: larger;
-
 }
-a{
-    text-decoration: none;
+
+header {
+    background-color: #2c3e50;
+    align-items: center;
+    position: relative;
+    z-index: 2;
+    padding: 30px;
+    display: flex;
+    justify-content: space-between;
+}
+
+header img {
+    width: 30px;
+    height: auto;
+}
+
+.textomenu a {
+    font-family: 'Montserrat', sans-serif;
     color: white;
+    text-align: center;
+    text-decoration: none;
+}
+
+.nomes a{
+    font-size: 25px;
+    text-decoration: none;
+    color: rgb(4, 119, 0);
+    font-weight: bold;
 }
 h2{
+    padding:  15px;
     font-size: 40px;
-    color: rgb(217, 0, 225);
+    color: #326da8;
 }
 .divtitulo {
     display: flex;
@@ -20,17 +49,18 @@ h2{
 }
 
 .divtitulo path {
-    fill: white;
+    fill: #326da8;
 }
 
 h1 {
-    color: white;
-    padding-top: 10px;
+    color: #326da8;
+    padding-top: 30px;
 }
+
 table {
     justify-content: center;
 }
 svg{
     display: flex;
-    padding: 25px;
+    padding: 15px;
 }

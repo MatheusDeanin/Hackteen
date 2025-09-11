@@ -3,6 +3,7 @@
 * {
     margin: 0;
     padding: 0;
+    box-sizing: border-box; /* Adicionado para melhor controle de layout */
 }
 
 body {
@@ -11,15 +12,42 @@ body {
 }
 
 header {
-    justify-content: space-between;
     display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding: 10px;
     background-color: #2c3e50;
-    align-items: center;
     position: relative;
     z-index: 2;
 }
 
+#form-container {
+    border-radius: 5px;
+    padding: 10px;
+    background: #f9f9f9;
+}
+
+input#endereco {
+    padding: 8px;
+    margin-right: 5px;
+}
+
+.Buscar {
+    width: 150px;
+}
+
+.textomenu {
+    padding-top: 3px;
+}
+
+.textomenu a {
+    font-family: 'Montserrat', sans-serif;
+    color: white;
+    text-align: center;
+    text-decoration: none;
+}
+
+/* --- Estilos de Botões Globais --- */
 button {
     box-shadow: 2px 2px 2px 0px rgba(0, 0, 0, 0.582);
     width: 70px;
@@ -30,11 +58,16 @@ button {
     color: white;
     margin: 5px;
     background-color: #326da8;
-    transition: transform 0.5s ease ;
+    transition: transform 0.5s ease;
 }
 
-#endereço {
-    margin-left: 5px;
+button:hover {
+    transform: scale(1.05);
+}
+
+/* --- Mapa e Overlays --- */
+#map {
+    height: 85vh;
 }
 
 #tela-carregamento {
@@ -43,41 +76,18 @@ button {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: #374b5e50;
+    background-color: rgba(55, 75, 94, 0.8); /* Corrigido para um valor mais opaco */
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    z-index: 999999;
+    z-index: 1000;
 }
 
 #tela-carregamento.esconder {
     display: none;
 }
 
-/* Estilo para a caixa de sugestão */
-#sugestao-virada {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background-color: #34495e;
-    color: white;
-    padding: 15px 25px;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    z-index: 1000;
-    font-weight: bold;
-    text-align: center;
-    transition: opacity 0.3s ease-in-out;
-}
-
-/* A classe 'esconder' que já existe será usada para esconder a caixa */
-#sugestao-virada.esconder {
-    display: none;
-    opacity: 0;
-}
-
-/* Estilização para o spinner (agora dentro do #tela-carregamento) */
 .spinner {
     border: 6px solid #f3f3f3;
     border-top: 6px solid #3498db;
@@ -87,7 +97,6 @@ button {
     animation: spin 1s linear infinite;
 }
 
-/* O texto "Carregando..." */
 #tela-carregamento p {
     color: #fff;
     font-size: 1.2em;
@@ -99,25 +108,44 @@ button {
     100% { transform: rotate(360deg); }
 }
 
-#map {
-    height: 85vh;
+#overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1; 
+    display: none;
 }
 
-#form-container {
-    border-radius: 5px;
-    padding: 10px;
-    background: #f9f9f9;
+#overlay.visivel {
+    display: block;
 }
 
-input, button {
-    padding: 8px;
-    margin-right: 5px;
+/* --- Sugestão de Rota --- */
+#sugestao-virada {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    max-width: 250px;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 
-.Buscar {
-    width: 150px;
+#sugestao-virada.esconder {
+    display: none;
 }
 
+/* --- Sidebar --- */
 #sidebar {
     height: 100%;
     width: 250px;
@@ -127,7 +155,11 @@ input, button {
     background-color: #34495e;
     overflow-x: hidden;
     transition: 0.3s;
-    z-index: 9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999 !important;
+    z-index: 999; /* z-index ajustado para um valor mais seguro */
+}
+
+#sidebar.aberto {
+    left: 0;
 }
 
 #sidebar h1 {
@@ -135,16 +167,6 @@ input, button {
     padding: 5px;
     font-family: 'Montserrat', sans-serif;
     color: white;
-}
-
-#sidebar svg {
-    fill: white;
-    width: 20px;
-    height: 20px;
-}
-
-.amazon {
-    padding-bottom: 20px;
 }
 
 #sidebar a {
@@ -160,41 +182,88 @@ input, button {
     background-color: #3e5b76;
 }
 
-main {
-      padding: 20px;
-}
-
-#sidebar.aberto {
-    left: 0;
-}
-    
-.textomenu {
-    padding-top: 3px;
-}
-
-.textomenu a {
-    font-family: 'Montserrat', sans-serif;
-    color: white;
-    text-align: center;
-    text-decoration: none;
-}
-
-#overlay {
+/* --- Estilos para o QR Code Retrátil --- */
+/* Estilos para o QR Code Retrátil */
+#qrcode-container {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5); /* fundo escuro semi-transparente */
-    z-index: 1; /* abaixo do header, acima do conteúdo */
+    bottom: 80px;
+    right: 20px;
+    width: 60px; /* Largura inicial */
+    height: 60px; /* Altura inicial */
+    background: #34495e;
+    color: #fff;
+    border-radius: 50%; /* Faz com que o botão inicial seja redondo */
+    z-index: 1000;
+    overflow: hidden; /* Esconde o conteúdo que transborda */
+    transition: width 0.3s ease, height 0.3s ease, border-radius 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+#qrcode-container.aberto {
+    padding-bottom: 50px;
+    width: 250px; /* Largura expandida */
+    height: 380px; /* Altura expandida */
+    border-radius: 8px; /* Cantos quadrados quando expandido */
+    background: #fff; /* Fundo branco para o QR Code */
+    color: #333;
+}
+
+#qrcode-container.esconder {
     display: none;
 }
 
-#overlay.visivel {
-    display: block;
+#qrcode-expander {
+    /* **Ajustes feitos aqui:** */
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    padding-top: 60px;
+    margin: 0;
+    background: transparent;
+    border: none;
+    color: white;
+    font-weight: bold;
+    font-size: 1.2em;
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+    /* Adicionado para centralizar o texto "QR" */
+    display: flex; /* Transforma em flex container */
+    justify-content: center; /* Centraliza horizontalmente */
+    align-items: center; /* Centraliza verticalmente */
 }
 
+#qrcode-container.aberto #qrcode-expander {
+    opacity: 0; /* Esconde o botão quando expandido */
+    pointer-events: none;
+}
 
-button:hover {
-    transform: scale(1.05, 1.05);
+#qrcode-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+    height: 100%;
+    transform: scale(0); /* Esconde o conteúdo inicialmente */
+    transition: transform 0.3s ease;
+}
+
+#qrcode-container.aberto #qrcode-content {
+    transform: scale(1); /* Mostra o conteúdo quando expandido */
+}
+
+#qrcode-content h3 {
+    margin: 0;
+}
+
+#qrcode-content button {
+    padding: 8px 16px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
 }
