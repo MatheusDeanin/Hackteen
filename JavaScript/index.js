@@ -85,7 +85,56 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
 }).addTo(map);
 
-// Funções auxiliares
+// ---------- Funções auxiliares melhoradas ----------
+
+function animateMarker(marker, toLatLng, duration = 1000) {
+    const from = marker.getLatLng();
+    const start = performance.now();
+
+    function frame(now) {
+        const progress = Math.min((now - start) / duration, 1);
+
+        const lat = from.lat + (toLatLng.lat - from.lat) * progress;
+        const lng = from.lng + (toLatLng.lng - from.lng) * progress;
+
+        marker.setLatLng([lat, lng]);
+
+        if (progress < 1) {
+            requestAnimationFrame(frame);
+        }
+    }
+
+    requestAnimationFrame(frame);
+}
+
+
+// Flatten latlng arrays returned by GeoJSON / Polyline (handles nested arrays)
+function flattenLatLngs(latlngs) {
+    const out = [];
+    function walk(item) {
+        if (!item) return;
+        // If it's a LatLng object
+        if (item.lat !== undefined && item.lng !== undefined) {
+            out.push(item);
+            return;
+        }
+        // If it's an array
+        if (Array.isArray(item)) {
+            // If array looks like [lng, lat]
+            if (item.length >= 2 && typeof item[0] === 'number' && typeof item[1] === 'number') {
+                out.push(L.latLng(item[1], item[0]));
+                return;
+            }
+            // Otherwise walk deeper
+            item.forEach(sub => walk(sub));
+            return;
+        }
+        // Unknown type, ignore
+    }
+    walk(latlngs);
+    return out;
+}
+
 function calcularDistancia(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const latitude1 = lat1 * Math.PI/180;
@@ -98,31 +147,60 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
+// Retorna lista plana de pontos (L.LatLng) da rota atual
+function coletarPontosDaRota() {
+    let pontos = [];
+    if (rotaLayer) {
+        rotaLayer.eachLayer(layer => {
+            if (layer instanceof L.Polyline) {
+                const lats = layer.getLatLngs();
+                pontos = pontos.concat(flattenLatLngs(lats));
+            }
+        });
+    } else if (rotaPolyline) {
+        pontos = flattenLatLngs(rotaPolyline.getLatLngs());
+    }
+    return pontos;
+}
+
+// Encontra o ponto mais próximo da rota e devolve ponto + índice + distância
 function encontrarProximoPontoNaRota(userLatLng, rotaPoints) {
+    if (!rotaPoints || rotaPoints.length === 0) return { ponto: null, index: -1, distancia: Infinity };
     let ponto = null;
     let menorDist = Infinity;
-    rotaPoints.forEach(p => {
+    let menorIndex = -1;
+    rotaPoints.forEach((p, idx) => {
         const d = calcularDistancia(userLatLng.lat, userLatLng.lng, p.lat, p.lng);
         if (d < menorDist) {
             menorDist = d;
             ponto = p;
+            menorIndex = idx;
         }
     });
-    return ponto;
+    return { ponto, index: menorIndex, distancia: menorDist };
 }
 
-function coletarPontosDaRota() {
-    let pontos = [];
-    if (!rotaLayer) return pontos;
-    rotaLayer.eachLayer(layer => {
-        if (layer instanceof L.Polyline) {
-            let lats = layer.getLatLngs();
-            if (Array.isArray(lats[0])) lats.forEach(sub => pontos = pontos.concat(sub));
-            else pontos = pontos.concat(lats);
-        }
-    });
-    return pontos;
+// Atualiza a linha de rota para mostrar apenas os pontos a partir de index
+function atualizarRotaRestante(pontos, index) {
+    if (!rotaPolyline || !Array.isArray(pontos)) return;
+    const restante = pontos.slice(index);
+    if (restante.length < 2) {
+        // rota concluída
+        if (rotaLayer) map.removeLayer(rotaLayer);
+        rotaLayer = null;
+        rotaPolyline = null;
+        return;
+    }
+    try {
+        rotaPolyline.setLatLngs(restante);
+        // opcional: atualiza bounds sem forçar zoom brusco
+        // map.fitBounds(rotaPolyline.getBounds());
+    } catch (e) {
+        console.warn('Não foi possível atualizar rota restante:', e);
+    }
 }
+
+// ---------- Fim funções auxiliares ----------
 
 function removerWaypointPorCoordenada(latlng) {
     const index = waypoints.findIndex(wp => wp.lat === latlng.lat && wp.lng === latlng.lng);
@@ -266,13 +344,6 @@ function adicionarWaypoint(latlng) {
     }
 }
 
-function removerWaypointPorCoordenada(latlng) {
-    const index = waypoints.findIndex(wp => wp.lat === latlng.lat && wp.lng === latlng.lng);
-    if (index !== -1) {
-        removerWaypoint(index);
-    }
-}
-
 function removerWaypoint(index, registrarHistorico = true) {
     if (waypointMarkers[index]) map.removeLayer(waypointMarkers[index]);
     const removido = waypoints[index];
@@ -367,7 +438,7 @@ function buscarERotear() {
         if (routeData.features && routeData.features.length > 0) {
             rotaLayer = L.geoJSON(routeData, {style:{color:'blue', weight:5}}).addTo(map);
             rotaPolyline = rotaLayer.getLayers().find(l => l instanceof L.Polyline) || null;
-            map.fitBounds(rotaLayer.getBounds());
+            if (rotaLayer && rotaLayer.getBounds) map.fitBounds(rotaLayer.getBounds());
             instrucoesRota = routeData.features[0]?.properties?.segments[0]?.steps || [];
             proximaInstrucaoIndex = 0;
             document.getElementById("qrcode-container").classList.remove("esconder");
@@ -456,7 +527,46 @@ if (navigator.geolocation) {
             }
         }
 
-        if (instrucoesRota.length > 0 && proximaInstrucaoIndex < instrucoesRota.length) {
+        // Novas regras para monitorar se está fora da rota e atualizar rota percorrida
+        if (rotaPolyline) {
+            const pontos = coletarPontosDaRota();
+            const snapObj = encontrarProximoPontoNaRota(userLatLng, pontos);
+
+            if (snapObj.ponto) {
+                const distancia = snapObj.distancia;
+
+                // Se estiver muito longe do ponto mais próximo da rota -> recalcular
+                if (distancia > 30) {
+                    if (!recalculando && waypoints.length > 0) {
+                        recalculando = true;
+                        // importante: atualiza o marcador para a posição real ANTES de recalcular
+                        userMarker.setLatLng(userLatLng);
+                        buscarERotear();
+                        setTimeout(() => { recalculando = false; }, 15000);
+                    } else {
+                        // garante que o marcador não seja "snapado" enquanto recalculando
+                        userMarker.setLatLng(userLatLng);
+                    }
+                } else {
+                    // Ainda está dentro da rota -> snap no ponto mais próximo
+                    animateMarker(userMarker, pontoSnap, 500); // 500ms de transição
+                    userPath.addLatLng(snapObj.ponto);
+
+                    // Atualiza a rota para remover a parte já percorrida
+                    atualizarRotaRestante(pontos, snapObj.index);
+
+                    // Rotaciona o ícone em direção ao próximo ponto
+                    const nextPoint = pontos[snapObj.index + 1] || pontos[snapObj.index];
+                    if (nextPoint) {
+                        const angulo = calcularAnguloEntreDoisPontos(snapObj.ponto, nextPoint);
+                        const el = userMarker.getElement && userMarker.getElement();
+                        const iconDiv = el && el.querySelector && el.querySelector('.user-icon');
+                        if (iconDiv) iconDiv.style.transform = `rotate(${angulo}deg)`;
+                    }
+                }
+            }
+        } else if (instrucoesRota.length > 0 && proximaInstrucaoIndex < instrucoesRota.length) {
+            // fallback para rotas com instruções (caso rotaPolyline esteja undefined)
             const instr = instrucoesRota[proximaInstrucaoIndex];
 
             if (instr && instr.location) {
@@ -464,44 +574,7 @@ if (navigator.geolocation) {
                 mostrarSugestao(`${instr.instruction} em ${Math.round(d)}m`);
                 if (d < 10) proximaInstrucaoIndex++;
             }
-        } else if (rotaPolyline) {
-            const pontos = coletarPontosDaRota();
-            const snap = encontrarProximoPontoNaRota(userLatLng, pontos);
-
-            if (snap) {
-                const distancia = calcularDistancia(lat, lon, snap.lat, snap.lng);
-
-                if (distancia > 30) {
-                    // Está fora da rota, re-calcula
-                    if (!recalculando && waypoints.length > 0) {
-                        recalculando = true;
-                        buscarERotear();
-                        setTimeout(() => { recalculando = false; }, 15000);
-                    }
-                    userMarker.setLatLng(userLatLng); // Não "snap" o marcador
-                } else {
-                    // Ainda está dentro da rota
-                    userMarker.setLatLng(snap);
-                    userPath.addLatLng(snap);
-                }
-            }
-            
-            else if (rotaPolyline) {
-                const pontos = rotaPolyline.getLatLngs();
-                const userLatLng = L.latLng(lat, lon);
-
-                const proximoPonto = pontos.find(p => calcularDistancia(lat, lon, p.lat, p.lng) > 5);
-                if (proximoPonto) {
-                    const angulo = calcularAnguloEntreDoisPontos(userLatLng, proximoPonto);
-                    const iconDiv = userMarker.getElement().querySelector('.user-icon');
-                    if (iconDiv) {
-                        iconDiv.style.transform = `rotate(${angulo}deg)`;
-                    }
-                }
-            }
-
         }
-
 
     }, erro => { alert("Não foi possível obter sua localização."); hideload(); }, {
         enableHighAccuracy: true,
