@@ -267,3 +267,22 @@ button:hover {
     border: none;
     cursor: pointer;
 }
+
+@media (max-width: 600px) {
+    header {
+        display: block;
+    }
+
+    .textomenu {
+        text-align: center;
+    }
+
+    #form-container {
+        background: none;
+        padding-left: 7%;
+    }
+
+    #botaoMenu {
+        margin-left: 37%;
+    }
+}

@@ -52,7 +52,6 @@ p{
         url("Background.png") no-repeat center center fixed;
     background-size: cover;
     padding-bottom: 10px;
-    height: 500px;
 }
 
 .texto-imagem {
@@ -115,4 +114,28 @@ hr {
     width: 60%;
     justify-self: center;
     margin-bottom: 30px;
+}
+
+@media (max-width: 600px) {
+    .texto-imagem {
+        display: block;
+        height: 760px;
+    }
+
+    .logo {
+        padding-left: 45%;
+        width: 40px;
+        height: 40px;
+    }
+    .mapa {
+        display: block;
+    }
+
+    hr {
+        width: 75%;
+    }
+
+    .bugs {
+        text-align: center;
+    }
 }

@@ -35,13 +35,13 @@ header img {
 .nomes a{
     font-size: 25px;
     text-decoration: none;
-    color: rgb(4, 119, 0);
+    color: rgb(10, 14, 238);
     font-weight: bold;
 }
 h2{
     padding:  15px;
     font-size: 40px;
-    color: #326da8;
+    color: #000000;
 }
 .divtitulo {
     display: flex;
@@ -49,11 +49,11 @@ h2{
 }
 
 .divtitulo path {
-    fill: #326da8;
+    fill: #000000;
 }
 
 h1 {
-    color: #326da8;
+    color: #000000;
     padding-top: 30px;
 }
 

@@ -42,23 +42,26 @@ function hideload() {
     document.getElementById("tela-carregamento").classList.add("esconder");
 }
 
-// Sugestão de virada
-function mostrarSugestao(mensagem) {
-    const caixa = document.getElementById("sugestao-virada");
-    const texto = document.getElementById("texto-sugestao");
-    texto.textContent = mensagem;
-    caixa.classList.remove("esconder");
-}
-function esconderSugestao() {
-    document.getElementById("sugestao-virada").classList.add("esconder");
+function calcularAnguloEntreDoisPontos(p1, p2) {
+    const dx = p2.lng - p1.lng;
+    const dy = p2.lat - p1.lat;
+    const rad = Math.atan2(dy, dx);
+    const deg = (rad * 180) / Math.PI;
+    return deg;
 }
 
-// Ícone
-const airplaneIcon = L.icon({
-    iconUrl: './imagens/usuariomarker.png',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
+
+let userRotation = 0;
+
+const userDivIcon = L.divIcon({
+  className: "user-marker",
+  html: `<div class="user-icon" style="transform: rotate(190deg);">
+            <img src="./imagens/usuariomarker.png" width="32" height="32"/>
+         </div>`,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
 });
+
 
 // Variáveis
 let waypoints = [];
@@ -226,7 +229,16 @@ function buscarERotear() {
         return;
     }
     
-    const coords = [userMarker.getLatLng(), ...waypoints].map(p => [p.lng, p.lat]);
+    // Ordena os waypoints pela distância do usuário
+    const userLatLng = userMarker.getLatLng();
+    const waypointsOrdenados = [...waypoints].sort((a, b) => {
+        const distA = calcularDistancia(userLatLng.lat, userLatLng.lng, a.lat, a.lng);
+        const distB = calcularDistancia(userLatLng.lat, userLatLng.lng, b.lat, b.lng);
+        return distA - distB;
+    });
+
+    const coords = [userLatLng, ...waypointsOrdenados].map(p => [p.lng, p.lat]);
+
     showloadscreen();
 
     fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
@@ -281,7 +293,7 @@ function buscarCoordenadas(endereco) {
         });
 }
 
-// Nova função para adicionar endereço
+// Função para adicionar endereço
 function adicionarEndereco() {
     const endereco = document.getElementById('endereco').value;
     if (!endereco) {
@@ -322,7 +334,7 @@ if (navigator.geolocation) {
         const userLatLng = L.latLng(lat, lon);
 
         if (!userMarker) {
-            userMarker = L.marker(userLatLng, {icon: airplaneIcon}).addTo(map);
+            userMarker = L.marker(userLatLng, {icon: userDivIcon}).addTo(map);
             hideload();
             map.setView(userLatLng, 15);
             if (waypoints.length > 0 && !rotaInicialCarregada) {
@@ -347,20 +359,41 @@ if (navigator.geolocation) {
         } else if (rotaPolyline) {
             const pontos = coletarPontosDaRota();
             const snap = encontrarProximoPontoNaRota(userLatLng, pontos);
-            if (snap && calcularDistancia(lat, lon, snap.lat, snap.lng) < 40) {
-                userMarker.setLatLng(snap);
-                userPath.addLatLng(snap);
-            } else {
-                userMarker.setLatLng(userLatLng);
-                if (!recalculando && waypoints.length > 0) {
-                    recalculando = true;
-                    buscarERotear();
-                    setTimeout(() => { recalculando = false; }, 15000);
+
+            if (snap) {
+                const distancia = calcularDistancia(lat, lon, snap.lat, snap.lng);
+
+                if (distancia > 30) {
+                    // Está fora da rota, re-calcula
+                    if (!recalculando && waypoints.length > 0) {
+                        recalculando = true;
+                        buscarERotear();
+                        setTimeout(() => { recalculando = false; }, 15000);
+                    }
+                    userMarker.setLatLng(userLatLng); // Não "snap" o marcador
+                } else {
+                    // Ainda está dentro da rota
+                    userMarker.setLatLng(snap);
+                    userPath.addLatLng(snap);
                 }
             }
-        } else {
-            userMarker.setLatLng(userLatLng);
+            
+            else if (rotaPolyline) {
+                const pontos = rotaPolyline.getLatLngs();
+                const userLatLng = L.latLng(lat, lon);
+
+                const proximoPonto = pontos.find(p => calcularDistancia(lat, lon, p.lat, p.lng) > 5);
+                if (proximoPonto) {
+                    const angulo = calcularAnguloEntreDoisPontos(userLatLng, proximoPonto);
+                    const iconDiv = userMarker.getElement().querySelector('.user-icon');
+                    if (iconDiv) {
+                        iconDiv.style.transform = `rotate(${angulo}deg)`;
+                    }
+                }
+            }
+
         }
+
 
     }, erro => { alert("Não foi possível obter sua localização."); hideload(); }, {
         enableHighAccuracy: true,
