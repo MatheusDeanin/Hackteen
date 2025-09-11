@@ -42,7 +42,5 @@ Todas as requisições precisam incluir esse cabeçalho:
 ```http
 Authorization: your_api_key
 Content-Type: application/json
-
-
----
+```
 
