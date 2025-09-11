@@ -18,7 +18,7 @@ Para utilizar, basta o usuário informar:
 2. Os pontos intermediários (paradas)
 3. E recebe uma **rota otimizada**, com a ordem ideal das paradas
 
-No **backend** foi usado API OpenRouter e linguagem HTML, CSS e JavaScript
+No **backend** foi usado API OpenRouteService e linguagem HTML, CSS e JavaScript
 
 
  Documentação da API – OpenRouteService
