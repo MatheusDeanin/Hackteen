@@ -43,4 +43,4 @@ Todas as requisições precisam incluir esse cabeçalho:
 Authorization: your_api_key
 Content-Type: application/json
 ```
-
+---
