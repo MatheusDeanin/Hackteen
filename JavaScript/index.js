@@ -64,6 +64,8 @@ const userDivIcon = L.divIcon({
 
 
 // Variáveis
+let undoStack = [];
+let redoStack = [];
 let waypoints = [];
 let waypointMarkers = [];
 let userMarker = null;
@@ -122,6 +124,70 @@ function coletarPontosDaRota() {
     return pontos;
 }
 
+function removerWaypointPorCoordenada(latlng) {
+    const index = waypoints.findIndex(wp => wp.lat === latlng.lat && wp.lng === latlng.lng);
+    if (index !== -1) {
+        removerWaypoint(index);
+    }
+}
+
+document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+        desfazerWaypoint();
+    }
+    if (e.ctrlKey && e.key.toLowerCase() === 'y') {
+        refazerWaypoint();
+    }
+});
+
+
+function desfazerWaypoint() {
+    const acao = undoStack.pop();
+    if (!acao) return;
+
+    if (acao.tipo === "add") {
+        const index = waypoints.findIndex(wp => wp.lat === acao.latlng.lat && wp.lng === acao.latlng.lng);
+        if (index !== -1) {
+            removerWaypoint(index, false); // false = não registrar no histórico
+        }
+    } else if (acao.tipo === "remove") {
+        waypoints.splice(acao.index, 0, acao.latlng);
+        const marker = L.marker(acao.latlng).addTo(map);
+        marker.bindPopup(`
+            <b>Waypoint</b><br>
+            <button class="btn-remover">Remover</button>
+        `);
+        marker.on("popupopen", () => {
+            const btn = document.querySelector(".btn-remover");
+            if (btn) {
+                btn.onclick = () => {
+                    removerWaypointPorCoordenada(acao.latlng);
+                };
+            }
+        });
+
+        waypointMarkers.splice(acao.index, 0, marker);
+        atualizarUrlComWaypoints();
+        buscarERotear();
+    }
+
+    redoStack.push(acao);
+}
+
+function refazerWaypoint() {
+    const acao = redoStack.pop();
+    if (!acao) return;
+
+    if (acao.tipo === "add") {
+        adicionarWaypoint(acao.latlng); // já registra no histórico
+    } else if (acao.tipo === "remove") {
+        const index = waypoints.findIndex(wp => wp.lat === acao.latlng.lat && wp.lng === acao.latlng.lng);
+        if (index !== -1) {
+            removerWaypoint(index); // já registra no histórico
+        }
+    }
+}
+
 // Funções para salvar e carregar waypoints da URL
 function atualizarUrlComWaypoints() {
     const coordsString = waypoints.map(p => `${p.lat},${p.lng}`).join(';');
@@ -172,13 +238,27 @@ function adicionarWaypoint(latlng) {
     }
 
     waypoints.push(latlng);
+
     const marker = L.marker(latlng).addTo(map);
     marker.bindPopup(`
         <b>Waypoint</b><br>
-        <button onclick="removerWaypoint(${waypoints.length - 1})">Remover</button>
+        <button class="btn-remover">Remover</button>
     `);
+    marker.on("popupopen", () => {
+        const btn = document.querySelector(".btn-remover");
+        if (btn) {
+            btn.onclick = () => {
+                removerWaypointPorCoordenada(latlng);
+            };
+        }
+    });
+
     waypointMarkers.push(marker);
-    
+
+    // Salvar ação no histórico
+    undoStack.push({ tipo: "add", latlng });
+    redoStack = []; // limpa o histórico de refazer
+
     atualizarUrlComWaypoints();
 
     if (userMarker) {
@@ -186,11 +266,24 @@ function adicionarWaypoint(latlng) {
     }
 }
 
-function removerWaypoint(index) {
+function removerWaypointPorCoordenada(latlng) {
+    const index = waypoints.findIndex(wp => wp.lat === latlng.lat && wp.lng === latlng.lng);
+    if (index !== -1) {
+        removerWaypoint(index);
+    }
+}
+
+function removerWaypoint(index, registrarHistorico = true) {
     if (waypointMarkers[index]) map.removeLayer(waypointMarkers[index]);
-    waypointMarkers.splice(index,1);
-    waypoints.splice(index,1);
-    
+    const removido = waypoints[index];
+    waypointMarkers.splice(index, 1);
+    waypoints.splice(index, 1);
+
+    if (registrarHistorico) {
+        undoStack.push({ tipo: "remove", latlng: removido, index });
+        redoStack = [];
+    }
+
     atualizarUrlComWaypoints();
 
     if (rotaLayer) {
@@ -237,7 +330,22 @@ function buscarERotear() {
         return distA - distB;
     });
 
-    const coords = [userLatLng, ...waypointsOrdenados].map(p => [p.lng, p.lat]);
+    const coordsOriginais = [userLatLng, ...waypointsOrdenados];
+
+    const coords = coordsOriginais
+        .map(p => [Number(p.lng), Number(p.lat)])
+        .filter((value, index, self) =>
+            index === self.findIndex(p => p[0] === value[0] && p[1] === value[1])
+        );
+
+    if (coords.length < 2) {
+        alert("É necessário pelo menos dois pontos únicos para traçar a rota.");
+        hideload();
+        return;
+    }
+
+    console.log("Coordenadas enviadas para ORS:", coords);
+
 
     showloadscreen();
 
