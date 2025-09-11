@@ -3,10 +3,10 @@
 # Etec Rodrigues de Abreu
 **Participantes:** [Matheus Jordão](https://github.com/MatheusJordao12/); [Matheus Deanin](https://github.com/MatheusDeanin/); [Julia](); [Lucas](https://github.com/LcsGomes-AMS/).
 
-Projeto feito pelo os alunos do 1ºAMS - ETEC/FATEC, para o Hackteen.</p>
+Projeto feito pelo os alunos do 1ºAMS - ETEC/FATEC, para o Hackteen.
 |A DriveGood é uma aplicação web que permite ao usuário inserir um destino final e diversos pontos de parada.  
-A plataforma então calcula o **trajeto mais eficiente**, utilizando algoritmos de otimização de rotas. Ideal para motoristas, entregadores e qualquer pessoa que precisa realizar múltiplas tarefas durante o deslocamento.</p>
-<p>Apps de navegação comuns traçam rotas entre dois pontos, mas não oferecem uma otimização real quando o usuário precisa passar por **vários lugares antes de chegar ao destino**. Isso gera:
+A plataforma então calcula o **trajeto mais eficiente**, utilizando algoritmos de otimização de rotas. Ideal para motoristas, entregadores e qualquer pessoa que precisa realizar múltiplas tarefas durante o deslocamento.
+Apps de navegação comuns traçam rotas entre dois pontos, mas não oferecem uma otimização real quando o usuário precisa passar por **vários lugares antes de chegar ao destino**. Isso gera:
 
 - Perda de tempo
 - Gasto excessivo de combustível
