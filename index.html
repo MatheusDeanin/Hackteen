@@ -13,11 +13,13 @@
   </head>
   <body>
     <header>
-      <button id="botaoMenu">☰ Menu</button>
+      <button class="menu" id="botaoMenu">☰ Menu</button>
       <div id="form-container">
-        <input type="text" id="endereco" placeholder="Digite um endereço..." />
+        <input type="text" id="endereco" placeholder="Digite um endereço..." autocomplete="off" />
         <button class="Buscar" onclick="adicionarEndereco()">Buscar e Traçar Rota</button>
-        </div>
+        <div id="sugestoes-ultimas"></div>
+        <div id="sugestoes-proximas"></div>
+    </div>
         <div id="tela-carregamento" class="esconder">
           <div class="spinner"></div> <p>Carregando...</p>
         </div>

@@ -21,7 +21,27 @@ header {
     z-index: 2;
 }
 
+.menu {
+    width: 150px;
+    box-shadow: 2px 2px 2px 0px rgba(0, 0, 0, 0.582);
+    width: 70px;
+    height: 40px;
+    border: 2px solid rgb(124, 124, 124);
+    border-radius: 5px;
+    cursor: pointer;
+    color: white;
+    margin: 5px;
+    background-color: #326da8;
+    transition: transform 0.5s ease;
+}
+
+.menu:hover {
+    transform: scale(1.1);
+}
+
 #form-container {
+    width: 320px;
+    height: 70px;
     border-radius: 5px;
     padding: 10px;
     background: #f9f9f9;
@@ -32,8 +52,52 @@ input#endereco {
     margin-right: 5px;
 }
 
-.Buscar {
-    width: 150px;
+/* --- Últimas pesquisas e sugestões --- */
+#sugestoes-ultimas, #sugestoes-proximas {
+    margin-top: 5px;
+    display: flex;
+    flex-direction: column; /* fica em coluna para dropdown */
+    gap: 5px;
+    background: #f9f9f9;
+    border-radius: 5px;
+    padding: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    position: absolute;
+    z-index: 1006; /* acima do mapa */
+    width: 300px; /* largura similar ao input */
+}
+
+#sugestoes-ultimas button, #sugestoes-proximas button {
+    text-align: left;
+    background-color: #3388ff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.3s ease;
+}
+
+#sugestoes-ultimas button:hover, #sugestoes-proximas button:hover {
+    background-color: #1d63b0;
+}
+
+/* Posicionamento do container relativo ao input */
+#form-container {
+    position: relative; /* necessário para o dropdown absoluto */
+}
+
+.btn-sugestao {
+    background-color: #3388ff;
+    color: white;
+    border: none;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
 }
 
 .textomenu {
@@ -47,21 +111,25 @@ input#endereco {
     text-decoration: none;
 }
 
+.Buscar {
+    width: 150px;
+}
+
 /* --- Estilos de Botões Globais --- */
-button {
+.Buscar {
     box-shadow: 2px 2px 2px 0px rgba(0, 0, 0, 0.582);
-    width: 70px;
+    width: 91px;
     height: 40px;
     border: 2px solid rgb(124, 124, 124);
     border-radius: 5px;
     cursor: pointer;
     color: white;
-    margin: 5px;
+
     background-color: #326da8;
     transition: transform 0.5s ease;
 }
 
-button:hover {
+.Buscar:hover {
     transform: scale(1.05);
 }
 
@@ -284,5 +352,11 @@ button:hover {
 
     #botaoMenu {
         margin-left: 37%;
+    }
+
+    #sugestoes-ultimas, #sugestoes-proximas {
+        width: 90vw;
+        right: 0;
+        left: 5vw;
     }
 }

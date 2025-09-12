@@ -34,6 +34,10 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 });
 
+
+// Configuração de chave
+chave_api = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0="
+
 // Loading
 function showloadscreen() {
     document.getElementById("tela-carregamento").classList.remove("esconder");
@@ -84,6 +88,37 @@ let userPath = L.polyline([], {color: 'gray', weight: 8}).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
 }).addTo(map);
+
+// Pesquisas
+function salvarUltimaPesquisa(endereco) {
+    let ultimas = JSON.parse(localStorage.getItem("ultimasPesquisas")) || [];
+    // Remove duplicados
+    ultimas = ultimas.filter(e => e !== endereco);
+    // Adiciona no início
+    ultimas.unshift(endereco);
+    // Mantém apenas as 3 últimas
+    ultimas = ultimas.slice(0, 3);
+    localStorage.setItem("ultimasPesquisas", JSON.stringify(ultimas));
+    atualizarSugestoes();
+}
+
+function atualizarSugestoes() {
+    const ultimas = JSON.parse(localStorage.getItem("ultimasPesquisas")) || [];
+    const container = document.getElementById("sugestoes-ultimas");
+    if (!container) return;
+
+    container.innerHTML = ""; // limpa
+    ultimas.forEach(endereco => {
+        const btn = document.createElement("button");
+        btn.className = "btn-sugestao";
+        btn.innerText = endereco;
+        btn.onclick = () => {
+            document.getElementById("endereco").value = endereco;
+            adicionarEndereco();
+        };
+        container.appendChild(btn);
+    });
+}
 
 // ---------- Funções auxiliares melhoradas ----------
 
@@ -218,72 +253,110 @@ document.addEventListener('keydown', function (e) {
     }
 });
 
+// função genérica para atualizar o texto de sugestão (usa o seu HTML)
+function mostrarSugestao(texto) {
+    const el = document.getElementById("texto-sugestao");
+    if (el) el.innerText = texto;
+}
 
-// ---------- Função de roteamento (usar OSRM público para teste) ----------
+// Função robusta de buscar e rotear (OSRM)
 async function buscarERotear() {
-  try {
-    if (!userMarker) {
-      console.warn('buscarERotear: userMarker ainda não definido — a rota será calculada quando houver posição do usuário.');
-      return;
+    try {
+        // Precauções iniciais
+        if (!userMarker) {
+            console.warn('buscarERotear: userMarker ainda não definido — aguardando posição do usuário.');
+            mostrarSugestao("Aguardando posição do usuário...");
+            return;
+        }
+
+        if (!waypoints || waypoints.length === 0) {
+            // limpa rota anterior
+            if (rotaLayer) { map.removeLayer(rotaLayer); rotaLayer = null; }
+            if (rotaPolyline) { map.removeLayer(rotaPolyline); rotaPolyline = null; }
+            instrucoesRota = [];
+            mostrarSugestao("Nenhum waypoint definido.");
+            return;
+        }
+
+        // Indica que a rota está sendo calculada
+        mostrarSugestao("Aguardando rota...");
+
+        // Monta coordenadas (start = usuário)
+        const start = userMarker.getLatLng();
+        const coordsArr = [start].concat(waypoints.map(w => L.latLng(w.lat, w.lng)));
+        const coordsStr = coordsArr.map(p => `${p.lng},${p.lat}`).join(';');
+
+        const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Erro na API de rotas (status ${res.status})`);
+        const data = await res.json();
+        if (!data.routes || !data.routes.length) throw new Error('Nenhuma rota retornada pelo servidor de roteamento.');
+
+        const route = data.routes[0];
+
+        // Extrai coordenadas da geometria (suporta GeoJSON LineString)
+        let latlngs = [];
+        if (route.geometry && route.geometry.coordinates) {
+            latlngs = flattenLatLngs(route.geometry.coordinates);
+        } else if (route.geometry && route.geometry.type === 'LineString' && route.geometry.coordinates) {
+            latlngs = flattenLatLngs(route.geometry.coordinates);
+        } else {
+            throw new Error('Geometria da rota inesperada.');
+        }
+
+        // Remove rota anterior (se existir)
+        if (rotaLayer) { map.removeLayer(rotaLayer); rotaLayer = null; }
+        if (rotaPolyline) { map.removeLayer(rotaPolyline); rotaPolyline = null; }
+
+        // Cria nova polyline (rotaPolyline deve ser a polyline)
+        rotaPolyline = L.polyline(latlngs, { color: '#3388ff', weight: 6 });
+
+        // Criar um layerGroup que contenha a polyline (mantém compatibilidade com seu código)
+        rotaLayer = L.layerGroup().addTo(map);
+        rotaLayer.addLayer(rotaPolyline);
+
+        // Ajusta view (sem zoom brutal)
+        try { map.fitBounds(rotaPolyline.getBounds(), { padding: [50, 50] }); } catch (e) { /* ignore */ }
+
+        // Extrai instruções (steps) para fallback / UI
+        instrucoesRota = [];
+        if (route.legs && Array.isArray(route.legs)) {
+            route.legs.forEach(leg => {
+                if (leg.steps && Array.isArray(leg.steps)) {
+                    leg.steps.forEach(step => {
+                        const m = step.maneuver || {};
+                        const instrText = (step.name ? `${step.name} — ` : '') +
+                                          (m.instruction || `${m.type || ''} ${m.modifier || ''}`).trim();
+                        instrucoesRota.push({
+                            instruction: instrText || 'Siga em frente',
+                            location: [
+                                m.location ? m.location[1] : (step.geometry && step.geometry.coordinates && step.geometry.coordinates[0] ? step.geometry.coordinates[0][1] : null),
+                                m.location ? m.location[0] : (step.geometry && step.geometry.coordinates && step.geometry.coordinates[0] ? step.geometry.coordinates[0][0] : null)
+                            ],
+                            distance: step.distance,
+                            duration: step.duration
+                        });
+                    });
+                }
+            });
+        }
+
+        proximaInstrucaoIndex = 0;
+
+        // Mostra primeira instrução (ou fallback)
+        if (instrucoesRota.length > 0) {
+            mostrarSugestao(instrucoesRota[0].instruction);
+        } else {
+            mostrarSugestao("Rota calculada, sem instruções detalhadas.");
+        }
+
+    } catch (err) {
+        console.error('buscarERotear erro:', err);
+        mostrarSugestao("Erro ao calcular rota.");
+        // opcional: alerta para o usuário
+        alert('Erro ao calcular rota: ' + (err.message || err));
     }
-    if (!waypoints || waypoints.length === 0) {
-      // limpa rota anterior se não houver waypoints
-      if (rotaLayer) { map.removeLayer(rotaLayer); rotaLayer = null; }
-      if (rotaPolyline) { map.removeLayer(rotaPolyline); rotaPolyline = null; }
-      instrucoesRota = [];
-      return;
-    }
-
-    // Monta lista de pontos: começa pelo usuário (start) e inclui waypoints na ordem atual
-    const start = userMarker.getLatLng();
-    const coordsArr = [start].concat(waypoints.map(w => L.latLng(w.lat, w.lng)));
-    const coordsStr = coordsArr.map(p => `${p.lng},${p.lat}`).join(';');
-
-    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true`;
-
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Erro na API de rotas (status ${res.status})`);
-    const data = await res.json();
-    if (!data.routes || !data.routes.length) throw new Error('Nenhuma rota retornada pelo servidor de roteamento.');
-
-    const route = data.routes[0];
-
-    // Remove rota anterior
-    if (rotaLayer) { map.removeLayer(rotaLayer); rotaLayer = null; }
-    if (rotaPolyline) { map.removeLayer(rotaPolyline); rotaPolyline = null; }
-
-    // Converte GeoJSON LineString em LatLngs e cria uma polyline (mantém setLatLngs disponível)
-    const latlngs = flattenLatLngs(route.geometry.coordinates);
-    rotaPolyline = L.polyline(latlngs, { color: '#3388ff', weight: 6 }).addTo(map);
-    rotaLayer = rotaPolyline;
-
-    // Ajusta view sem zoom brusco
-    try { map.fitBounds(rotaPolyline.getBounds(), { padding: [50, 50] }); } catch (e) { /* ignore */ }
-
-    // Extrai instruções (para mostrar na UI / usar fallback caso rotaPolyline não exista)
-    instrucoesRota = [];
-    route.legs.forEach(leg => {
-      leg.steps.forEach(step => {
-        const m = step.maneuver || {};
-        // monta uma instrução legível (OSRM nem sempre tem 'instruction' textual)
-        const instrText = (step.name ? `${step.name} — ` : '') +
-                          (m.instruction || `${m.type || ''} ${m.modifier || ''}`).trim();
-        instrucoesRota.push({
-          instruction: instrText || 'Siga em frente',
-          location: [m.location ? m.location[1] : (step.geometry && step.geometry.coordinates[0][1]) || null,
-                     m.location ? m.location[0] : (step.geometry && step.geometry.coordinates[0][0]) || null],
-          distance: step.distance,
-          duration: step.duration
-        });
-      });
-    });
-    proximaInstrucaoIndex = 0;
-
-  } catch (err) {
-    console.error('buscarERotear erro:', err);
-    // mostra mensagem simples ao usuário
-    alert('Erro ao calcular rota: ' + (err.message || err));
-  }
 }
 
 function desfazerWaypoint() {
@@ -452,7 +525,7 @@ async function otimizarRota(waypoints) {
     const res = await fetch("https://api.openrouteservice.org/v2/optimization", { // <-- sem 0.0.0.0
         method: "POST",
         headers: {
-            "Authorization": "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0=",
+            "Authorization": chave_api,
             "Content-Type": "application/json"
         },
         body: JSON.stringify(body)
@@ -528,7 +601,7 @@ async function otimizarRota(waypoints) {
   const res = await fetch("api.openrouteservice.org/v2/directions", {
     method: "POST",
     headers: {
-      "Authorization": "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0=",
+      "Authorization": chave_api,
       "Content-Type": "application/json"
     },
     body: JSON.stringify(body)
@@ -594,35 +667,58 @@ function adicionarEndereco() {
         return;
     }
 
+    salvarUltimaPesquisa(endereco); // <-- novo
     showloadscreen();
 
     buscarCoordenadas(endereco)
-        .then(({ lat, lng, raw, alternatives }) => {
-            // adiciona o waypoint escolhido (melhor candidato)
+        .then(({ lat, lng, alternatives }) => {
             adicionarWaypoint({ lat, lng });
 
-            // marca visualmente as alternativas por alguns segundos (ajuda no debug UX)
+            // mostra alternativas no mapa
             alternatives.forEach(a => {
-                try {
-                    const circle = L.circleMarker([a.lat, a.lon], { radius: 6, weight: 1, opacity: 0.8 }).addTo(map);
-                    circle.bindPopup(`Alternativa: ${a.display_name} (score ${a.score})`);
-                    setTimeout(() => {
-                        if (map.hasLayer(circle)) map.removeLayer(circle);
-                    }, 7000);
-                } catch (e) { /* ignore */ }
+                const circle = L.circleMarker([a.lat, a.lon], { radius: 6, weight: 1, opacity: 0.8 }).addTo(map);
+                circle.bindPopup(`Alternativa: ${a.display_name} (score ${a.score})`);
+                setTimeout(() => {
+                    if (map.hasLayer(circle)) map.removeLayer(circle);
+                }, 7000);
             });
 
-            // opcional: centralizar um pouco para o destino escolhido
-            try { map.panTo([lat, lng]); } catch(e) {}
+            map.panTo([lat, lng]);
         })
         .catch(error => {
             alert(error.message || "Erro ao buscar endereço.");
             console.error(error);
         })
-        .finally(() => {
-            hideload();
-        });
+        .finally(() => hideload());
 }
+
+const input = document.getElementById("endereco");
+input.addEventListener("input", function() {
+    const query = input.value.trim();
+    const container = document.getElementById("sugestoes-proximas");
+    if (!container) return;
+
+    if (query.length < 3) {
+        container.innerHTML = "";
+        return;
+    }
+
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`)
+        .then(res => res.json())
+        .then(data => {
+            container.innerHTML = "";
+            data.forEach(d => {
+                const btn = document.createElement("button");
+                btn.className = "btn-sugestao";
+                btn.innerText = d.display_name;
+                btn.onclick = () => {
+                    input.value = d.display_name;
+                    adicionarWaypoint({ lat: Number(d.lat), lng: Number(d.lon) });
+                };
+                container.appendChild(btn);
+            });
+        });
+});
 
 // Evento que desativa o foco da câmera quando o usuário arrasta o mapa
 map.on('movestart', function() {
@@ -721,3 +817,89 @@ if (navigator.geolocation) {
 map.on('click', e => adicionarWaypoint(e.latlng));
 
 carregarWaypointsDaUrl();
+
+// ---------- garantir função mostrarSugestao (se já existir, ignora) ----------
+if (typeof mostrarSugestao !== "function") {
+  function mostrarSugestao(texto) {
+    const el = document.getElementById("texto-sugestao");
+    if (el) el.innerText = texto;
+  }
+}
+
+// ---------- logs simples para depuração ----------
+console.log("Debug: script carregado - listener de rotas ativo.");
+
+// Chamadas de debug em buscarERotear (opcional, só se você quiser ver no console)
+// Se você quiser, adicione um console.log no início de buscarERotear:
+// console.log("buscarERotear chamado. waypoints:", waypoints.length);
+
+// ---------- Se você estiver usando leaflet-routing-machine (routingControl) ----------
+if (typeof routingControl !== "undefined" && routingControl && routingControl.on) {
+  routingControl.on('routesfound', function(e) {
+    console.log("Debug: routingControl routesfound event", e);
+
+    const route = e.routes && e.routes[0];
+    if (!route) {
+      mostrarSugestao("Rota encontrada, mas sem dados.");
+      return;
+    }
+
+    // tenta extrair a instrução de forma robusta (vários formatos possíveis)
+    let textoInstrucao = "Rota calculada";
+    // 1) formato LRM: route.instructions ou route.routes[0].instructions
+    if (route.instructions && route.instructions.length) {
+      const instr = route.instructions[0];
+      textoInstrucao = instr.text || instr.instruction || textoInstrucao;
+    } else if (route.routes && route.routes[0] && route.routes[0].instructions && route.routes[0].instructions.length) {
+      const instr = route.routes[0].instructions[0];
+      textoInstrucao = instr.text || instr.instruction || textoInstrucao;
+    } else if (route.legs && route.legs.length) {
+      // fallback: pega primeira step
+      const leg = route.legs[0];
+      if (leg.steps && leg.steps.length) {
+        const step = leg.steps[0];
+        const m = step.maneuver || {};
+        textoInstrucao = (step.name ? `${step.name} — ` : '') + (m.instruction || step.instruction || step.name || "Siga em frente");
+      }
+    }
+
+    mostrarSugestao(textoInstrucao);
+  });
+}
+
+// ---------- Se você usa buscarERotear() (nosso método OSRM) e a rota estiver sendo criada ali ----------
+/*
+  No final da sua função buscarERotear(), logo após:
+      rotaPolyline = L.polyline(latlngs, { color: '#3388ff', weight: 6 });
+      rotaLayer = L.layerGroup().addTo(map);
+      rotaLayer.addLayer(rotaPolyline);
+  adicione também este trecho — ele garante que sempre que buscarERotear criar
+  a polyline, o texto seja atualizado:
+*/
+function _postProcessarRotaLocal() {
+  try {
+    if (instrucoesRota && instrucoesRota.length > 0) {
+      mostrarSugestao(instrucoesRota[0].instruction || "Siga em frente");
+    } else {
+      mostrarSugestao("Rota calculada, sem instruções detalhadas.");
+    }
+  } catch (e) {
+    console.warn("Debug: erro em _postProcessarRotaLocal", e);
+    mostrarSugestao("Rota calculada.");
+  }
+}
+// Chame _postProcessarRotaLocal() ao final de buscarERotear(), depois de criar rotaPolyline/rotaLayer.
+// Exemplo (no final de buscarERotear): _postProcessarRotaLocal();
+
+// ---------- debug extra para ver quando a polyline muda ----------
+const origAddLayer = L.LayerGroup.prototype.addLayer;
+L.LayerGroup.prototype.addLayer = function(layer) {
+  try {
+    if (layer instanceof L.Polyline) {
+      console.log("Debug: uma polyline foi adicionada ao LayerGroup -> atualizando sugestão.");
+      // se proximaInstrucaoIndex e instrucoesRota existirem, tenta mostrar
+      if (typeof _postProcessarRotaLocal === "function") _postProcessarRotaLocal();
+    }
+  } catch (e) { /* ignore */ }
+  return origAddLayer.call(this, layer);
+};
