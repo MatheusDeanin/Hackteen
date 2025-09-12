@@ -48,8 +48,10 @@ header {
 }
 
 input#endereco {
-    padding: 8px;
-    margin-right: 5px;
+    padding: 10px;
+    margin-right: 10px;
+    transform: translateY(-7px);
+
 }
 
 /* --- Últimas pesquisas e sugestões --- */
@@ -117,20 +119,21 @@ input#endereco {
 
 /* --- Estilos de Botões Globais --- */
 .Buscar {
-    box-shadow: 2px 2px 2px 0px rgba(0, 0, 0, 0.582);
+    box-shadow: 2px 2px 2px 0px rgba(76, 129, 189, 0.582);
     width: 91px;
     height: 40px;
     border: 2px solid rgb(124, 124, 124);
+    margin-top: 5px;
     border-radius: 5px;
     cursor: pointer;
     color: white;
 
-    background-color: #326da8;
+    background-color: #4e7aa3;
     transition: transform 0.5s ease;
 }
 
 .Buscar:hover {
-    transform: scale(1.05);
+    transform: scale(2.0);
 }
 
 /* --- Mapa e Overlays --- */
@@ -143,7 +146,6 @@ input#endereco {
     top: 0;
     left: 0;
     width: 100%;
-    height: 100%;
     background-color: rgba(55, 75, 94, 0.8); /* Corrigido para um valor mais opaco */
     display: flex;
     flex-direction: column;
@@ -228,6 +230,7 @@ input#endereco {
 
 #sidebar.aberto {
     left: 0;
+
 }
 
 #sidebar h1 {
@@ -238,12 +241,16 @@ input#endereco {
 }
 
 #sidebar a {
-    padding: 12px 20px;
+    font-family: 'Montserrat', sans-serif;
     text-decoration: none;
     font-size: 18px;
     color: white;
-    display: block;
-    transition: 0.2s;
+    display: flex;
+    transition: none;
+    animation: none;
+    padding: 12px 20px;
+    height: 50px;
+    width: 400px;
 }
 
 #sidebar a:hover {
