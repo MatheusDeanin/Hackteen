@@ -219,6 +219,73 @@ document.addEventListener('keydown', function (e) {
 });
 
 
+// ---------- Função de roteamento (usar OSRM público para teste) ----------
+async function buscarERotear() {
+  try {
+    if (!userMarker) {
+      console.warn('buscarERotear: userMarker ainda não definido — a rota será calculada quando houver posição do usuário.');
+      return;
+    }
+    if (!waypoints || waypoints.length === 0) {
+      // limpa rota anterior se não houver waypoints
+      if (rotaLayer) { map.removeLayer(rotaLayer); rotaLayer = null; }
+      if (rotaPolyline) { map.removeLayer(rotaPolyline); rotaPolyline = null; }
+      instrucoesRota = [];
+      return;
+    }
+
+    // Monta lista de pontos: começa pelo usuário (start) e inclui waypoints na ordem atual
+    const start = userMarker.getLatLng();
+    const coordsArr = [start].concat(waypoints.map(w => L.latLng(w.lat, w.lng)));
+    const coordsStr = coordsArr.map(p => `${p.lng},${p.lat}`).join(';');
+
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true`;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Erro na API de rotas (status ${res.status})`);
+    const data = await res.json();
+    if (!data.routes || !data.routes.length) throw new Error('Nenhuma rota retornada pelo servidor de roteamento.');
+
+    const route = data.routes[0];
+
+    // Remove rota anterior
+    if (rotaLayer) { map.removeLayer(rotaLayer); rotaLayer = null; }
+    if (rotaPolyline) { map.removeLayer(rotaPolyline); rotaPolyline = null; }
+
+    // Converte GeoJSON LineString em LatLngs e cria uma polyline (mantém setLatLngs disponível)
+    const latlngs = flattenLatLngs(route.geometry.coordinates);
+    rotaPolyline = L.polyline(latlngs, { color: '#3388ff', weight: 6 }).addTo(map);
+    rotaLayer = rotaPolyline;
+
+    // Ajusta view sem zoom brusco
+    try { map.fitBounds(rotaPolyline.getBounds(), { padding: [50, 50] }); } catch (e) { /* ignore */ }
+
+    // Extrai instruções (para mostrar na UI / usar fallback caso rotaPolyline não exista)
+    instrucoesRota = [];
+    route.legs.forEach(leg => {
+      leg.steps.forEach(step => {
+        const m = step.maneuver || {};
+        // monta uma instrução legível (OSRM nem sempre tem 'instruction' textual)
+        const instrText = (step.name ? `${step.name} — ` : '') +
+                          (m.instruction || `${m.type || ''} ${m.modifier || ''}`).trim();
+        instrucoesRota.push({
+          instruction: instrText || 'Siga em frente',
+          location: [m.location ? m.location[1] : (step.geometry && step.geometry.coordinates[0][1]) || null,
+                     m.location ? m.location[0] : (step.geometry && step.geometry.coordinates[0][0]) || null],
+          distance: step.distance,
+          duration: step.duration
+        });
+      });
+    });
+    proximaInstrucaoIndex = 0;
+
+  } catch (err) {
+    console.error('buscarERotear erro:', err);
+    // mostra mensagem simples ao usuário
+    alert('Erro ao calcular rota: ' + (err.message || err));
+  }
+}
+
 function desfazerWaypoint() {
     const acao = undoStack.pop();
     if (!acao) return;
@@ -302,10 +369,15 @@ function carregarWaypointsDaUrl() {
 // Funções de geração e controle do QR Code
 function gerarQRCode() {
     const qrcodeElement = document.getElementById("qrcode");
+    const content = document.getElementById("qrcode-content");
+
     if (qrcodeElement) {
         qrcodeElement.innerHTML = '';
         const urlDaRota = window.location.href;
         new QRCode(qrcodeElement, urlDaRota);
+
+        // Garante que o conteúdo apareça
+        content.classList.remove("esconder");
     }
 }
 
@@ -366,128 +438,188 @@ function removerWaypoint(index, registrarHistorico = true) {
     if (waypoints.length > 0 && userMarker) {
         buscarERotear();
     } else if (!waypoints.length) {
-        document.getElementById("qrcode-container").classList.add("esconder");
+        document.getElementById("qrcode-content").classList.add("esconder");
     }
 }
 
 // Roteamento
-function buscarERotear() {
-    if (!userMarker) {
-        return;
-    }
-    
-    if (rotaLayer) {
-        map.removeLayer(rotaLayer);
-        rotaLayer = null;
-        rotaPolyline = null;
-    }
+async function otimizarRota(waypoints) {
+    const body = {
+        jobs: waypoints.map((wp, i) => ({ id: i + 1, location: [wp.lng, wp.lat] })),
+        vehicles: [{ id: 1, profile: "driving-car", start: [userMarker.getLatLng().lng, userMarker.getLatLng().lat] }]
+    };
 
-    // Limpa a linha do trajeto do usuário
-    if (userPath) {
-        userPath.setLatLngs([]);
-    }
-
-    if (waypoints.length === 0) {
-        document.getElementById("qrcode-container").classList.add("esconder");
-        hideload(); // <-- adicionado
-        return;
-    }
-    
-    // Ordena os waypoints pela distância do usuário
-    const userLatLng = userMarker.getLatLng();
-    const waypointsOrdenados = [...waypoints].sort((a, b) => {
-        const distA = calcularDistancia(userLatLng.lat, userLatLng.lng, a.lat, a.lng);
-        const distB = calcularDistancia(userLatLng.lat, userLatLng.lng, b.lat, b.lng);
-        return distA - distB;
-    });
-
-    const coordsOriginais = [userLatLng, ...waypointsOrdenados];
-
-    const coords = coordsOriginais
-        .map(p => [Number(p.lng), Number(p.lat)])
-        .filter((value, index, self) =>
-            index === self.findIndex(p => p[0] === value[0] && p[1] === value[1])
-        );
-
-    if (coords.length < 2) {
-        alert("É necessário pelo menos dois pontos únicos para traçar a rota.");
-        hideload();
-        return;
-    }
-
-    console.log("Coordenadas enviadas para ORS:", coords);
-
-
-    showloadscreen();
-
-    fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
-        method: 'POST',
+    const res = await fetch("https://api.openrouteservice.org/v2/optimization", { // <-- sem 0.0.0.0
+        method: "POST",
         headers: {
-            'Authorization': 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0=',
-            'Content-Type': 'application/json'
+            "Authorization": "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0=",
+            "Content-Type": "application/json"
         },
-        body: JSON.stringify({coordinates: coords})
-    })
-    .then(res => {
-        if (!res.ok) { 
-            throw new Error(`Erro de rede: ${res.status}`);
-        }
-        return res.json();
-    })
-    .then(routeData => {
-        if (routeData.features && routeData.features.length > 0) {
-            rotaLayer = L.geoJSON(routeData, {style:{color:'blue', weight:5}}).addTo(map);
-            rotaPolyline = rotaLayer.getLayers().find(l => l instanceof L.Polyline) || null;
-            if (rotaLayer && rotaLayer.getBounds) map.fitBounds(rotaLayer.getBounds());
-            instrucoesRota = routeData.features[0]?.properties?.segments[0]?.steps || [];
-            proximaInstrucaoIndex = 0;
-            document.getElementById("qrcode-container").classList.remove("esconder");
-            gerarQRCode();
-        } else {
-            alert("Não foi possível encontrar uma rota para os waypoints selecionados. Tente outros pontos.");
-        }
-        hideload();
-        recalculando = false;
-    })
-    .catch(err => {
-        console.error(err);
-        alert(`Erro ao traçar a rota: ${err.message}`);
-        hideload(); // Garante que a tela de carregamento desapareça em caso de erro
-        recalculando = false;
+        body: JSON.stringify(body)
     });
+
+    if (!res.ok) {
+        throw new Error(`Erro na API: ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    // A resposta da ORS Optimization traz a ordem de jobs em data.routes[0].steps
+    const ordemOtima = data.routes[0].steps.map(step => {
+        const job = body.jobs.find(j => j.id === step.job);
+        return { lat: job.location[1], lng: job.location[0] };
+    });
+
+    return ordemOtima;
 }
 
+
 // Função para buscar as coordenadas de um endereço
+// ======= Geocoding robusto (Nominatim) =======
 function buscarCoordenadas(endereco) {
-    const urlGeocode = `https://api.openrouteservice.org/geocode/search?api_key=eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0=&text=${encodeURIComponent(endereco)}`;
-    
-    return fetch(urlGeocode)
-        .then(response => response.json())
+    const query = encodeURIComponent(endereco);
+    const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&limit=6&q=${query}`;
+
+    return fetch(url)
+        .then(res => {
+            if (!res.ok) throw new Error(`Erro no geocoder: ${res.status}`);
+            return res.json();
+        })
         .then(data => {
-            if (data.features && data.features.length > 0) {
-                const coords = data.features[0].geometry.coordinates;
-                return { lat: coords[1], lng: coords[0] };
+            if (!data || data.length === 0) throw new Error("Endereço não encontrado.");
+
+            const inputLower = endereco.toLowerCase();
+            const hasNumber = /\d+/.test(endereco);
+
+            // Pontua cada candidato
+            const scored = data.map(d => {
+                return Object.assign({}, d, { score: scoreCandidate(d, inputLower, hasNumber) });
+            }).sort((a, b) => b.score - a.score);
+
+            const best = scored[0];
+
+            // se confiança muito baixa, ainda assim retorna, mas loga para debug
+            if (best.score < 30) {
+                console.warn('Baixa confiança no geocode:', scored.map(s => ({ name: s.display_name, score: s.score })));
             }
-            throw new Error("Endereço não encontrado.");
+
+            return {
+                lat: Number(best.lat),
+                lng: Number(best.lon),
+                raw: best,
+                alternatives: scored.slice(1, 4) // até 3 alternativas
+            };
         });
 }
 
-// Função para adicionar endereço
+async function otimizarRota(waypoints) {
+  const body = {
+    jobs: waypoints.map((wp, i) => ({
+      id: i + 1,
+      location: [wp.lng, wp.lat]
+    })),
+    vehicles: [{
+      id: 1,
+      profile: "driving-car",
+      start: [userMarker.getLatLng().lng, userMarker.getLatLng().lat]
+    }]
+  };
+
+  const res = await fetch("api.openrouteservice.org/v2/directions", {
+    method: "POST",
+    headers: {
+      "Authorization": "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0=",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+    const data = await res.json();
+    console.log(data);
+
+    // A resposta traz a ordem ótima dos jobs
+    const ordemOtima = data.routes[0].steps.map(step => {
+        const job = body.jobs.find(j => j.id === step.job);
+        return { lat: job.location[1], lng: job.location[0] };
+    });
+
+    return ordemOtima;
+}
+
+
+function scoreCandidate(d, inputLower, hasNumber) {
+    const ad = d.address || {};
+    let s = 0;
+
+    // número da casa é prioridade alta
+    if (hasNumber && (ad.house_number || /\b\d+\b/.test(d.display_name))) s += 60;
+
+    // rua exata
+    if (ad.road && inputLower.includes(ad.road.toLowerCase())) s += 30;
+
+    // cidade/bairro
+    if (ad.city && inputLower.includes(ad.city.toLowerCase())) s += 25;
+    if (ad.town && inputLower.includes(ad.town.toLowerCase())) s += 20;
+    if (ad.suburb && inputLower.includes(ad.suburb.toLowerCase())) s += 10;
+
+    // palavras-chave comuns para POIs de saúde
+    const poiKeywords = ['upa','hospital','pronto atendimento','pronto-atendimento','posto de saúde','clinica','clínica','posto'];
+    if (d.class === 'amenity' && poiKeywords.some(k => inputLower.includes(k))) s += 40;
+    if ((d.display_name || '').toLowerCase().split(',').some(p => poiKeywords.some(k => p.includes(k)))) s += 20;
+
+    // preferir nodes (pontos) sobre áreas muito grandes (cidades/regiões)
+    if (d.osm_type === 'node') s += 10;
+
+    // bbox muito pequena -> ponto específico
+    if (d.boundingbox) {
+        const bb = d.boundingbox.map(Number);
+        const area = Math.abs((bb[2] - bb[0]) * (bb[3] - bb[1]));
+        if (area < 0.001) s += 10;
+    }
+
+    // importância fornecida pelo Nominatim
+    if (d.importance) s += Math.round(d.importance * 10);
+
+    // match exato do display_name (muito forte)
+    if ((d.display_name || '').toLowerCase() === inputLower) s += 50;
+
+    return s;
+}
+
+
 function adicionarEndereco() {
     const endereco = document.getElementById('endereco').value;
     if (!endereco) {
         alert("Por favor, digite um endereço.");
         return;
     }
-    
+
     showloadscreen();
 
     buscarCoordenadas(endereco)
-        .then(coordenadas => {
-            adicionarWaypoint(coordenadas);
+        .then(({ lat, lng, raw, alternatives }) => {
+            // adiciona o waypoint escolhido (melhor candidato)
+            adicionarWaypoint({ lat, lng });
+
+            // marca visualmente as alternativas por alguns segundos (ajuda no debug UX)
+            alternatives.forEach(a => {
+                try {
+                    const circle = L.circleMarker([a.lat, a.lon], { radius: 6, weight: 1, opacity: 0.8 }).addTo(map);
+                    circle.bindPopup(`Alternativa: ${a.display_name} (score ${a.score})`);
+                    setTimeout(() => {
+                        if (map.hasLayer(circle)) map.removeLayer(circle);
+                    }, 7000);
+                } catch (e) { /* ignore */ }
+            });
+
+            // opcional: centralizar um pouco para o destino escolhido
+            try { map.panTo([lat, lng]); } catch(e) {}
         })
         .catch(error => {
-            alert(error.message);
+            alert(error.message || "Erro ao buscar endereço.");
+            console.error(error);
+        })
+        .finally(() => {
             hideload();
         });
 }
@@ -539,17 +671,15 @@ if (navigator.geolocation) {
                 if (distancia > 30) {
                     if (!recalculando && waypoints.length > 0) {
                         recalculando = true;
-                        // importante: atualiza o marcador para a posição real ANTES de recalcular
                         userMarker.setLatLng(userLatLng);
                         buscarERotear();
                         setTimeout(() => { recalculando = false; }, 15000);
                     } else {
-                        // garante que o marcador não seja "snapado" enquanto recalculando
                         userMarker.setLatLng(userLatLng);
                     }
                 } else {
                     // Ainda está dentro da rota -> snap no ponto mais próximo
-                    animateMarker(userMarker, pontoSnap, 500); // 500ms de transição
+                    animateMarker(userMarker, snapObj.ponto, 500); // <-- CORREÇÃO AQUI
                     userPath.addLatLng(snapObj.ponto);
 
                     // Atualiza a rota para remover a parte já percorrida
@@ -565,6 +695,7 @@ if (navigator.geolocation) {
                     }
                 }
             }
+
         } else if (instrucoesRota.length > 0 && proximaInstrucaoIndex < instrucoesRota.length) {
             // fallback para rotas com instruções (caso rotaPolyline esteja undefined)
             const instr = instrucoesRota[proximaInstrucaoIndex];
