@@ -341,6 +341,12 @@ input#endereco {
         display: block;
     }
 
+    .Buscar {
+        padding: 0;
+        width: 150px;
+        font-size: 13px;
+    }
+
     .textomenu {
         text-align: center;
     }
@@ -348,6 +354,10 @@ input#endereco {
     #form-container {
         background: none;
         padding-left: 7%;
+    }
+
+    input#endereco {
+        width: 120px;
     }
 
     #botaoMenu {

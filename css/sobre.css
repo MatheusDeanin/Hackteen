@@ -122,6 +122,10 @@ hr {
         height: 760px;
     }
 
+    .pesquisa {
+        margin-left: 50%;
+    }
+
     .logo {
         padding-left: 45%;
         width: 40px;
