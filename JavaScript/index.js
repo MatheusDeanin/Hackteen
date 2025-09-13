@@ -354,9 +354,43 @@ async function buscarERotear() {
     } catch (err) {
         console.error('buscarERotear erro:', err);
         mostrarSugestao("Erro ao calcular rota.");
-        // opcional: alerta para o usuário
         alert('Erro ao calcular rota: ' + (err.message || err));
     }
+}
+
+function ordenarWaypointsPorProximidade(userLatLng, waypoints) {
+    if (!userLatLng || waypoints.length === 0) return waypoints;
+
+    const ordenados = []
+    const restantes = [...waypoints]
+
+    let atual = userLatLng
+
+    while(restantes.length > 0) {
+        let menordistancia = Infinity
+        let maisproximoindex = -1
+
+        restantes.forEach((wp, i) =>{
+            const d = calcularDistancia(atual.lat, atual.lng, wp.lat, wp.lng)
+            if (d < menordistancia){
+                menordistancia = d
+                maisproximoindex = i
+            }
+        })
+
+        const escolhido = restantes.splice(maisproximoindex, 1)[0]
+        ordenados.push(escolhido)
+        atual = escolhido
+    }
+
+    return ordenados
+}
+
+if (userMarker) {
+    const userLatLng = userMarker.getLatLng();
+    waypoints = ordenarWaypointsPorProximidade(userLatLng, waypoints);
+    atualizarUrlComWaypoints();
+    buscarERotear();
 }
 
 function desfazerWaypoint() {
@@ -471,20 +505,17 @@ function adicionarWaypoint(latlng) {
         const btn = document.querySelector(".btn-remover");
         if (btn) {
             btn.onclick = () => {
-                removerWaypointPorCoordenada(latlng);
+                removerWaypointPorCoordenada(latlng); // ✅ sempre por coordenada
             };
         }
     });
 
     waypointMarkers.push(marker);
 
-    // Salvar ação no histórico
-    undoStack.push({ tipo: "add", latlng });
-    redoStack = []; // limpa o histórico de refazer
-
     atualizarUrlComWaypoints();
 
     if (userMarker) {
+        waypoints = ordenarWaypointsPorProximidade(userMarker.getLatLng(), waypoints);
         buscarERotear();
     }
 }
@@ -829,11 +860,8 @@ if (typeof mostrarSugestao !== "function") {
 // ---------- logs simples para depuração ----------
 console.log("Debug: script carregado - listener de rotas ativo.");
 
-// Chamadas de debug em buscarERotear (opcional, só se você quiser ver no console)
-// Se você quiser, adicione um console.log no início de buscarERotear:
 // console.log("buscarERotear chamado. waypoints:", waypoints.length);
 
-// ---------- Se você estiver usando leaflet-routing-machine (routingControl) ----------
 if (typeof routingControl !== "undefined" && routingControl && routingControl.on) {
   routingControl.on('routesfound', function(e) {
     console.log("Debug: routingControl routesfound event", e);
@@ -867,15 +895,6 @@ if (typeof routingControl !== "undefined" && routingControl && routingControl.on
   });
 }
 
-// ---------- Se você usa buscarERotear() (nosso método OSRM) e a rota estiver sendo criada ali ----------
-/*
-  No final da sua função buscarERotear(), logo após:
-      rotaPolyline = L.polyline(latlngs, { color: '#3388ff', weight: 6 });
-      rotaLayer = L.layerGroup().addTo(map);
-      rotaLayer.addLayer(rotaPolyline);
-  adicione também este trecho — ele garante que sempre que buscarERotear criar
-  a polyline, o texto seja atualizado:
-*/
 function _postProcessarRotaLocal() {
   try {
     if (instrucoesRota && instrucoesRota.length > 0) {
@@ -888,8 +907,6 @@ function _postProcessarRotaLocal() {
     mostrarSugestao("Rota calculada.");
   }
 }
-// Chame _postProcessarRotaLocal() ao final de buscarERotear(), depois de criar rotaPolyline/rotaLayer.
-// Exemplo (no final de buscarERotear): _postProcessarRotaLocal();
 
 // ---------- debug extra para ver quando a polyline muda ----------
 const origAddLayer = L.LayerGroup.prototype.addLayer;
