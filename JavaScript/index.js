@@ -34,9 +34,8 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 });
 
-
 // Configuração de chave
-chave_api = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0="
+const chave_api = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0=";
 
 // Loading
 function showloadscreen() {
@@ -46,6 +45,7 @@ function hideload() {
     document.getElementById("tela-carregamento").classList.add("esconder");
 }
 
+// Calcula ângulo entre dois pontos
 function calcularAnguloEntreDoisPontos(p1, p2) {
     const dx = p2.lng - p1.lng;
     const dy = p2.lat - p1.lat;
@@ -53,7 +53,6 @@ function calcularAnguloEntreDoisPontos(p1, p2) {
     const deg = (rad * 180) / Math.PI;
     return deg;
 }
-
 
 let userRotation = 0;
 
@@ -65,7 +64,6 @@ const userDivIcon = L.divIcon({
   iconSize: [32, 32],
   iconAnchor: [16, 16],
 });
-
 
 // Variáveis
 let undoStack = [];
@@ -92,11 +90,8 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 // Pesquisas
 function salvarUltimaPesquisa(endereco) {
     let ultimas = JSON.parse(localStorage.getItem("ultimasPesquisas")) || [];
-    // Remove duplicados
     ultimas = ultimas.filter(e => e !== endereco);
-    // Adiciona no início
     ultimas.unshift(endereco);
-    // Mantém apenas as 3 últimas
     ultimas = ultimas.slice(0, 3);
     localStorage.setItem("ultimasPesquisas", JSON.stringify(ultimas));
     atualizarSugestoes();
@@ -106,8 +101,7 @@ function atualizarSugestoes() {
     const ultimas = JSON.parse(localStorage.getItem("ultimasPesquisas")) || [];
     const container = document.getElementById("sugestoes-ultimas");
     if (!container) return;
-
-    container.innerHTML = ""; // limpa
+    container.innerHTML = "";
     ultimas.forEach(endereco => {
         const btn = document.createElement("button");
         btn.className = "btn-sugestao";
@@ -120,51 +114,35 @@ function atualizarSugestoes() {
     });
 }
 
-// ---------- Funções auxiliares melhoradas ----------
-
+// ---------- Funções auxiliares ----------
 function animateMarker(marker, toLatLng, duration = 1000) {
     const from = marker.getLatLng();
     const start = performance.now();
 
     function frame(now) {
         const progress = Math.min((now - start) / duration, 1);
-
         const lat = from.lat + (toLatLng.lat - from.lat) * progress;
         const lng = from.lng + (toLatLng.lng - from.lng) * progress;
-
         marker.setLatLng([lat, lng]);
-
-        if (progress < 1) {
-            requestAnimationFrame(frame);
-        }
+        if (progress < 1) requestAnimationFrame(frame);
     }
 
     requestAnimationFrame(frame);
 }
 
-
-// Flatten latlng arrays returned by GeoJSON / Polyline (handles nested arrays)
 function flattenLatLngs(latlngs) {
     const out = [];
     function walk(item) {
         if (!item) return;
-        // If it's a LatLng object
-        if (item.lat !== undefined && item.lng !== undefined) {
-            out.push(item);
-            return;
-        }
-        // If it's an array
+        if (item.lat !== undefined && item.lng !== undefined) { out.push(item); return; }
         if (Array.isArray(item)) {
-            // If array looks like [lng, lat]
             if (item.length >= 2 && typeof item[0] === 'number' && typeof item[1] === 'number') {
                 out.push(L.latLng(item[1], item[0]));
                 return;
             }
-            // Otherwise walk deeper
             item.forEach(sub => walk(sub));
             return;
         }
-        // Unknown type, ignore
     }
     walk(latlngs);
     return out;
@@ -182,14 +160,12 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// Retorna lista plana de pontos (L.LatLng) da rota atual
 function coletarPontosDaRota() {
     let pontos = [];
     if (rotaLayer) {
         rotaLayer.eachLayer(layer => {
             if (layer instanceof L.Polyline) {
-                const lats = layer.getLatLngs();
-                pontos = pontos.concat(flattenLatLngs(lats));
+                pontos = pontos.concat(flattenLatLngs(layer.getLatLngs()));
             }
         });
     } else if (rotaPolyline) {
@@ -198,41 +174,26 @@ function coletarPontosDaRota() {
     return pontos;
 }
 
-// Encontra o ponto mais próximo da rota e devolve ponto + índice + distância
 function encontrarProximoPontoNaRota(userLatLng, rotaPoints) {
     if (!rotaPoints || rotaPoints.length === 0) return { ponto: null, index: -1, distancia: Infinity };
-    let ponto = null;
-    let menorDist = Infinity;
-    let menorIndex = -1;
+    let ponto = null, menorDist = Infinity, menorIndex = -1;
     rotaPoints.forEach((p, idx) => {
         const d = calcularDistancia(userLatLng.lat, userLatLng.lng, p.lat, p.lng);
-        if (d < menorDist) {
-            menorDist = d;
-            ponto = p;
-            menorIndex = idx;
-        }
+        if (d < menorDist) { menorDist = d; ponto = p; menorIndex = idx; }
     });
     return { ponto, index: menorIndex, distancia: menorDist };
 }
 
-// Atualiza a linha de rota para mostrar apenas os pontos a partir de index
 function atualizarRotaRestante(pontos, index) {
     if (!rotaPolyline || !Array.isArray(pontos)) return;
     const restante = pontos.slice(index);
     if (restante.length < 2) {
-        // rota concluída
         if (rotaLayer) map.removeLayer(rotaLayer);
         rotaLayer = null;
         rotaPolyline = null;
         return;
     }
-    try {
-        rotaPolyline.setLatLngs(restante);
-        // opcional: atualiza bounds sem forçar zoom brusco
-        // map.fitBounds(rotaPolyline.getBounds());
-    } catch (e) {
-        console.warn('Não foi possível atualizar rota restante:', e);
-    }
+    try { rotaPolyline.setLatLngs(restante); } catch (e) { console.warn('Não foi possível atualizar rota restante:', e); }
 }
 
 // ---------- Fim funções auxiliares ----------
