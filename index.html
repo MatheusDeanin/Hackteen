@@ -33,11 +33,25 @@
       <!-- Campo de busca por endereço e botão de traçar rota -->
       <div id="form-container">
         <div class="pesquisa">
-        <input type="text" id="endereco" placeholder="Digite um endereço..." autocomplete="off" />
-        <button class="Buscar" onclick="adicionarEndereco()">Buscar e Traçar Rota</button>
-        </div>
+        <!-- ANTES: <div class="pesquisa"> ... </div> -->
+        <form style="width: 300px; background-color: white; padding: 15px; border-radius: 5px;" id="searchForm" class="pesquisa" autocomplete="off" action="#" novalidate>
+        <input
+            style="width: 155px;"
+            type="search"
+            id="endereco"
+            name="endereco"
+            placeholder="Digite um endereço..."
+            autocomplete="off"
+            autocapitalize="off"
+            inputmode="search"
+            enterkeyhint="search"
+            aria-label="Pesquisar endereço"
+        />
+        <button type="submit" class="Buscar">Buscar e Traçar Rota</button>
+        </form>
         <div id="sugestoes-ultimas"></div>
         <div id="sugestoes-proximas"></div>
+    </div>
     </div>
         <div id="tela-carregamento" class="esconder">
           <div class="spinner"></div> <p>Carregando...</p>

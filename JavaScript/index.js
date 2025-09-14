@@ -2,6 +2,18 @@
 
 // Barra lateral e QR Code
 document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("searchForm");
+    const enderecoInput = document.getElementById("endereco");
+
+    if (form) {
+        form.addEventListener("submit", function (ev) {
+        ev.preventDefault();     // evita reload / envio tradicional
+        // opcional: remover focos para fechar teclado mais rápido
+        enderecoInput.blur();
+        // executa sua função de busca
+        adicionarEndereco();
+        });
+    }
     const botaoMenu = document.getElementById("botaoMenu");
     const sidebar = document.getElementById("sidebar");
     const overlay = document.getElementById("overlay");
@@ -9,7 +21,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const qrcodeExpander = document.getElementById("qrcode-expander");
     const qrcodeContent = document.getElementById("qrcode-content");
     const fecharQrCode = document.getElementById("fechar-qrcode");
-    const enderecoInput = document.getElementById("endereco");
 
     botaoMenu.addEventListener("click", function () {
         sidebar.classList.toggle("aberto");
