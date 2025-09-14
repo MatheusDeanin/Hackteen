@@ -1,4 +1,6 @@
-// Barra lateral
+// --- Início do seu código com as correções ---
+
+// Barra lateral e QR Code
 document.addEventListener("DOMContentLoaded", function () {
     const botaoMenu = document.getElementById("botaoMenu");
     const sidebar = document.getElementById("sidebar");
@@ -7,6 +9,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const qrcodeExpander = document.getElementById("qrcode-expander");
     const qrcodeContent = document.getElementById("qrcode-content");
     const fecharQrCode = document.getElementById("fechar-qrcode");
+    const enderecoInput = document.getElementById("endereco");
 
     botaoMenu.addEventListener("click", function () {
         sidebar.classList.toggle("aberto");
@@ -32,45 +35,18 @@ document.addEventListener("DOMContentLoaded", function () {
         qrcodeContainer.classList.remove("aberto");
         qrcodeContent.classList.add("esconder");
     });
-});
 
-// Carrega os waypoints salvos no localStorage, se existirem
-document.addEventListener("DOMContentLoaded", function() {
-    const savedWaypoints = localStorage.getItem('tempWaypoints');
-    if (savedWaypoints) {
-        // Converte os dados de volta para um array
-        waypoints = JSON.parse(savedWaypoints);
-
-        // Adiciona os marcadores no mapa e traça a rota
-        waypoints.forEach(wp => {
-            const marker = L.marker(wp).addTo(map);
-            waypointMarkers.push(marker);
-            // Encontra o índice do waypoint recém-adicionado
-            const novoIndex = waypoints.findIndex(wp => wp.lat === latlng.lat && wp.lng === latlng.lng);
-
-            // Cria o pop-up usando um atributo de dado para o índice
-            marker.bindPopup(`
-                <b>Waypoint</b><br>
-                <button class="btn-remover-popup" data-index="${novoIndex}">Remover</button>
-            `);
-
-            // Adiciona um listener de evento ao botão do pop-up
-            marker.on("popupopen", () => {
-                const btn = document.querySelector(".btn-remover-popup");
-                if (btn) {
-                    btn.onclick = (e) => {
-                        // Pega o índice do atributo de dado e o converte para um número
-                        const indexParaRemover = parseInt(e.target.dataset.index);
-                        // Chama a função de remoção com o índice correto
-                        removerWaypoint(indexParaRemover);
-                    };
-                }
-            });
+    if (enderecoInput) {
+        enderecoInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                adicionarEndereco();
+            }
         });
-
-        // Chama a função que traça a rota
-        buscarERotear();
     }
+
+    carregarWaypointsDaUrl();
+    atualizarSugestoes();
 });
 
 // Configuração de chave
@@ -84,7 +60,38 @@ function hideload() {
     document.getElementById("tela-carregamento").classList.add("esconder");
 }
 
-// Calcula ângulo entre dois pontos
+// Helpers
+function startRouteTrail() {
+  if (!map.hasLayer(routeTrail)) routeTrail.addTo(map);
+  isTrailActive = true;
+}
+
+function hideRouteTrail() {
+  if (map.hasLayer(routeTrail)) map.removeLayer(routeTrail);
+  isTrailActive = false;
+}
+
+function clearRouteTrail() {
+  routeTrailPoints = [];
+  routeTrail.setLatLngs([]);
+  if (map.hasLayer(routeTrail)) map.removeLayer(routeTrail);
+  isTrailActive = false;
+}
+
+// adiciona ponto ao trail (somente se ativo)
+function addPointToRouteTrail(latlng) {
+  if (!isTrailActive) return;
+  const last = routeTrailPoints.length ? routeTrailPoints[routeTrailPoints.length - 1] : null;
+  if (!last || last.distanceTo(latlng) > TRAIL_MIN_DISTANCE) {
+    routeTrailPoints.push(latlng);
+    routeTrail.addLatLng(latlng);
+  }
+}
+
+function latLngEquals(a, b, tol = 1e-6) {
+    return Math.abs(Number(a.lat) - Number(b.lat)) < tol && Math.abs(Number(a.lng) - Number(b.lng)) < tol;
+}
+
 function calcularAnguloEntreDoisPontos(p1, p2) {
     const dx = p2.lng - p1.lng;
     const dy = p2.lat - p1.lat;
@@ -93,18 +100,16 @@ function calcularAnguloEntreDoisPontos(p1, p2) {
     return deg;
 }
 
-let userRotation = 0;
-
 const userDivIcon = L.divIcon({
-  className: "user-marker",
-  html: `<div class="user-icon" style="transform: rotate(190deg);">
+    className: "user-marker",
+    html: `<div class="user-icon" style="transform: rotate(190deg);">
             <img src="./imagens/usuariomarker.png" width="32" height="32"/>
          </div>`,
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
 });
 
-// Variáveis
+// Variáveis globais
 let undoStack = [];
 let redoStack = [];
 let waypoints = [];
@@ -117,10 +122,21 @@ let proximaInstrucaoIndex = 0;
 let recalculando = false;
 let followUser = true;
 let followTimeout;
-let polylineload = []
 let rotaInicialCarregada = false;
+// SNAP & controle contra jitter
+const SNAP_LOOKAHEAD = 18;   // metros à frente para prever o snap (ajuste)
+const SNAP_SMOOTH_MS = 300;  // duração da animação do snap
+let _lastSnapTime = 0;
+let _lastSnapLatLng = null;
+
 
 const map = L.map('map').setView([-23.5505, -46.6333], 13);
+let routeTrailPoints = [];
+let routeTrail = L.polyline(routeTrailPoints, {
+  color: '#00c853', weight: 6, opacity: 0.9
+});
+let isTrailActive = false;
+const TRAIL_MIN_DISTANCE = 0.8;
 let userPath = L.polyline([], {color: 'gray', weight: 8}).addTo(map);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -133,6 +149,7 @@ function salvarUltimaPesquisa(endereco) {
     ultimas = ultimas.filter(e => e !== endereco);
     ultimas.unshift(endereco);
     ultimas = ultimas.slice(0, 3);
+    localStorage.setItem("ultimasPesquisas", JSON.stringify(ultimas));
     atualizarSugestoes();
 }
 
@@ -153,11 +170,10 @@ function atualizarSugestoes() {
     });
 }
 
-// ---------- Funções auxiliares ----------
+// Funções auxiliares de rota e mapa
 function animateMarker(marker, toLatLng, duration = 1000) {
     const from = marker.getLatLng();
     const start = performance.now();
-
     function frame(now) {
         const progress = Math.min((now - start) / duration, 1);
         const lat = from.lat + (toLatLng.lat - from.lat) * progress;
@@ -165,7 +181,6 @@ function animateMarker(marker, toLatLng, duration = 1000) {
         marker.setLatLng([lat, lng]);
         if (progress < 1) requestAnimationFrame(frame);
     }
-
     requestAnimationFrame(frame);
 }
 
@@ -187,7 +202,6 @@ function flattenLatLngs(latlngs) {
     return out;
 }
 
-// Função para calcular a distância entre dois pontos (haversine)
 function calcularDistancia(ponto1, ponto2) {
     const toRad = (valor) => (valor * Math.PI) / 180;
     const lat1 = toRad(ponto1.lat);
@@ -195,15 +209,12 @@ function calcularDistancia(ponto1, ponto2) {
     const lat2 = toRad(ponto2.lat);
     const lon2 = toRad(ponto2.lng);
     const R = 6371e3; // Raio da Terra em metros
-
     const deltaLat = lat2 - lat1;
     const deltaLon = lon2 - lon1;
-
     const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
         Math.cos(lat1) * Math.cos(lat2) *
         Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
     return R * c;
 }
 
@@ -221,11 +232,151 @@ function coletarPontosDaRota() {
     return pontos;
 }
 
+// -------- util: distancia mínima do ponto até a polyline (em metros) --------
+function distanciaMinimaPolyline(userLatLng, polylinePoints) {
+    if (!polylinePoints || polylinePoints.length === 0) return { distance: Infinity, nearestLatLng: null, nearestIndex: -1 };
+
+    // converte todos os latlngs para pontos de camada (pixels)
+    const layerPoints = polylinePoints.map(p => map.latLngToLayerPoint(L.latLng(p.lat, p.lng)));
+    const userPoint = map.latLngToLayerPoint(userLatLng);
+
+    // função para distância ponto-segmento em pixels
+    function pointToSegmentDist(px, p1, p2) {
+        const x = px.x, y = px.y;
+        const x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        if (dx === 0 && dy === 0) {
+            const dx0 = x - x1, dy0 = y - y1;
+            return Math.sqrt(dx0*dx0 + dy0*dy0);
+        }
+        const t = ((x - x1) * dx + (y - y1) * dy) / (dx*dx + dy*dy);
+        const tClamped = Math.max(0, Math.min(1, t));
+        const projX = x1 + tClamped * dx;
+        const projY = y1 + tClamped * dy;
+        const ddx = x - projX, ddy = y - projY;
+        return Math.sqrt(ddx*ddx + ddy*ddy);
+    }
+
+    let minPix = Infinity;
+    let nearestIdx = -1;
+    let nearestProj = null;
+
+    for (let i = 0; i < layerPoints.length - 1; i++) {
+        const p1 = layerPoints[i], p2 = layerPoints[i+1];
+        const dPix = pointToSegmentDist(userPoint, p1, p2);
+        if (dPix < minPix) {
+            minPix = dPix;
+            nearestIdx = i;
+            // calcular projeção (recalcula t)
+            const dx = p2.x - p1.x, dy = p2.y - p1.y;
+            const denom = dx*dx + dy*dy;
+            let t = 0;
+            if (denom !== 0) t = ((userPoint.x - p1.x) * dx + (userPoint.y - p1.y) * dy) / denom;
+            t = Math.max(0, Math.min(1, t));
+            nearestProj = L.point(p1.x + dx*t, p1.y + dy*t);
+        }
+    }
+
+    if (nearestProj === null) {
+        // fallback: usar primeiro ponto
+        nearestProj = layerPoints[0];
+        nearestIdx = 0;
+    }
+
+    // converte pix -> metros: obtenha metros por pixel no mapa atual
+    const mp1 = map.layerPointToLatLng(L.point(0,0));
+    const mp2 = map.layerPointToLatLng(L.point(1,0));
+    const metersPerPixel = map.distance(mp1, mp2);
+
+    const distanceMeters = minPix * metersPerPixel;
+    const nearestLatLng = map.layerPointToLatLng(nearestProj);
+
+    return { distance: distanceMeters, nearestLatLng, nearestIndex: nearestIdx };
+}
+
+// retorna um ponto interpolado entre a e b, dado t [0..1]
+function lerpLatLng(a, b, t) {
+    return L.latLng(a.lat + (b.lat - a.lat) * t, a.lng + (b.lng - a.lng) * t);
+}
+
+// avança ao longo da polyline (array de {lat,lng}) a partir de um ponto de projeção
+// startIndex = índice do segmento (pontos[startIndex] -> pontos[startIndex+1])
+// startProjection = L.LatLng da projeção inicial (ponto sobre a polyline)
+// advanceMeters = quantos metros avançar a partir da projection
+// retorna { latlng: L.LatLng, arrivedIndex, remainingMeters: number }
+function pontoAvancadoNaPolyline(pontos, startIndex, startProjection, advanceMeters) {
+    if (!pontos || pontos.length === 0) return { latlng: startProjection, arrivedIndex: startIndex, remainingMeters: 0 };
+
+    // distância do projection até o fim do segmento startIndex
+    const segEnd = pontos[startIndex + 1] || pontos[startIndex];
+    let rem = advanceMeters;
+    // distância da proj no segmento até segEnd
+    let dToSegEnd = calcularDistancia(startProjection, segEnd);
+
+    let idx = startIndex;
+    let currentPoint = startProjection;
+
+    // se já avançou até o fim do segmento:
+    while (rem > dToSegEnd && idx < pontos.length - 2) {
+        rem -= dToSegEnd;
+        idx++;
+        currentPoint = pontos[idx];
+        dToSegEnd = calcularDistancia(currentPoint, pontos[idx + 1]);
+    }
+
+    // se ficou dentro do segmento atual (idx)
+    if (rem <= dToSegEnd && dToSegEnd > 0) {
+        // interpolação t entre currentPoint e pontos[idx+1]
+        const total = dToSegEnd;
+        // queremos um ponto a 'rem' metros após currentPoint
+        // compute fraction along segment from currentPoint to segEnd:
+        const t = rem / total;
+        const a = currentPoint;
+        const b = pontos[idx + 1];
+        const lat = a.lat + (b.lat - a.lat) * t;
+        const lng = a.lng + (b.lng - a.lng) * t;
+        return { latlng: L.latLng(lat, lng), arrivedIndex: idx, remainingMeters: 0 };
+    } else {
+        // chegamos no fim da polyline
+        const last = pontos[pontos.length - 1];
+        return { latlng: L.latLng(last.lat, last.lng), arrivedIndex: pontos.length - 1, remainingMeters: rem - dToSegEnd };
+    }
+}
+
+// Função principal de snap + previsão
+// userLatLng: posição real do usuário
+// pontos: array de pontos da rota (como retornado por coletarPontosDaRota())
+// options: { lookaheadMeters, smoothDuration }
+function snapPredict(userLatLng, pontos, options = {}) {
+    if (!pontos || pontos.length < 2 || !userLatLng) return null;
+    const lookaheadMeters = options.lookaheadMeters || 18; // ajuste fino aqui
+    // usa a função que você já tem — retorna nearestIndex (indice do segmento) e nearestLatLng (projeção)
+    const distObj = distanciaMinimaPolyline(userLatLng, pontos);
+    const proj = distObj.nearestLatLng;
+    const segIndex = distObj.nearestIndex >= 0 ? distObj.nearestIndex : 0;
+
+    // pega ponto avançado a partir da projeção
+    const avanc = pontoAvancadoNaPolyline(pontos, segIndex, proj, lookaheadMeters);
+
+    // também calcula um ponto um pouco à frente para definir o heading (mais lookahead curto)
+    const headingAvanc = pontoAvancadoNaPolyline(pontos, avanc.arrivedIndex, avanc.latlng, Math.max(6, lookaheadMeters / 3));
+
+    return {
+        projected: proj,
+        snapPoint: avanc.latlng,
+        snapIndex: avanc.arrivedIndex,
+        headingPoint: headingAvanc.latlng,
+        distanceToRoute: distObj.distance
+    };
+}
+
+
 function encontrarProximoPontoNaRota(userLatLng, rotaPoints) {
     if (!rotaPoints || rotaPoints.length === 0) return { ponto: null, index: -1, distancia: Infinity };
     let ponto = null, menorDist = Infinity, menorIndex = -1;
     rotaPoints.forEach((p, idx) => {
-        const d = calcularDistancia(userLatLng.lat, userLatLng.lng, p.lat, p.lng);
+        const d = calcularDistancia(userLatLng, p);
         if (d < menorDist) { menorDist = d; ponto = p; menorIndex = idx; }
     });
     return { ponto, index: menorIndex, distancia: menorDist };
@@ -243,15 +394,7 @@ function atualizarRotaRestante(pontos, index) {
     try { rotaPolyline.setLatLngs(restante); } catch (e) { console.warn('Não foi possível atualizar rota restante:', e); }
 }
 
-// ---------- Fim funções auxiliares ----------
-
-function removerWaypointPorCoordenada(latlng) {
-    const index = waypoints.findIndex(wp => wp.lat === latlng.lat && wp.lng === latlng.lng);
-    if (index !== -1) {
-        removerWaypoint(index);
-    }
-}
-
+// Funções de Waypoint e UI
 document.addEventListener('keydown', function (e) {
     if (e.ctrlKey && e.key.toLowerCase() === 'z') {
         desfazerWaypoint();
@@ -261,14 +404,12 @@ document.addEventListener('keydown', function (e) {
     }
 });
 
-// função genérica para atualizar o texto de sugestão (usa o seu HTML)
 function mostrarSugestao(texto) {
     const el = document.getElementById("texto-sugestao");
     if (el) el.innerText = texto;
 }
 
-// Função robusta de buscar e rotear (OSRM)
-// ✅ Versão corrigida: Reordena os waypoints de forma otimizada
+// ✅ Função que realiza a otimização da rota
 function reordenarWaypointsOtimizada(listaWaypoints) {
     if (listaWaypoints.length <= 1) {
         return listaWaypoints;
@@ -277,7 +418,7 @@ function reordenarWaypointsOtimizada(listaWaypoints) {
     let rotaOtimizada = [];
     let pontosRestantes = [...listaWaypoints];
     
-    // Inicia a rota com o primeiro ponto, que é o ponto de partida
+    // Inicia a rota com o primeiro ponto
     let pontoAtual = pontosRestantes.shift(); 
     rotaOtimizada.push(pontoAtual);
 
@@ -300,116 +441,12 @@ function reordenarWaypointsOtimizada(listaWaypoints) {
             pontoAtual = proximoPonto;
             pontosRestantes.splice(indexDoProximoPonto, 1);
         } else {
-            // Caso de falha: Adiciona o restante dos pontos sem otimização
-            // Isso evita um loop infinito em casos de erro de cálculo
             rotaOtimizada = rotaOtimizada.concat(pontosRestantes);
             pontosRestantes = [];
         }
     }
 
     return rotaOtimizada;
-}
-
-// A função 'calcularDistancia' permanece a mesma
-function calcularDistancia(ponto1, ponto2) {
-    const toRad = (valor) => (valor * Math.PI) / 180;
-    const lat1 = toRad(ponto1.lat);
-    const lon1 = toRad(ponto1.lng);
-    const lat2 = toRad(ponto2.lat);
-    const lon2 = toRad(ponto2.lng);
-    const R = 6371e3; // Raio da Terra em metros
-
-    const deltaLat = lat2 - lat1;
-    const deltaLon = lon2 - lon1;
-
-    const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-        Math.cos(lat1) * Math.cos(lat2) *
-        Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c;
-}
-
-function ordenarWaypointsPorProximidade(userLatLng, waypoints) {
-    if (!userLatLng || waypoints.length === 0) return waypoints;
-
-    const ordenados = []
-    const restantes = [...waypoints]
-
-    let atual = userLatLng
-
-    while(restantes.length > 0) {
-        let menordistancia = Infinity
-        let maisproximoindex = -1
-
-        restantes.forEach((wp, i) =>{
-            const d = calcularDistancia(atual.lat, atual.lng, wp.lat, wp.lng)
-            if (d < menordistancia){
-                menordistancia = d
-                maisproximoindex = i
-            }
-        })
-
-        const escolhido = restantes.splice(maisproximoindex, 1)[0]
-        ordenados.push(escolhido)
-        atual = escolhido
-    }
-
-    return ordenados
-}
-
-if (userMarker) {
-    const userLatLng = userMarker.getLatLng();
-    waypoints = ordenarWaypointsPorProximidade(userLatLng, waypoints);
-    atualizarUrlComWaypoints();
-    buscarERotear();
-}
-
-function desfazerWaypoint() {
-    const acao = undoStack.pop();
-    if (!acao) return;
-
-    if (acao.tipo === "add") {
-        const index = waypoints.findIndex(wp => wp.lat === acao.latlng.lat && wp.lng === acao.latlng.lng);
-        if (index !== -1) {
-            removerWaypoint(index, false); // false = não registrar no histórico
-        }
-    } else if (acao.tipo === "remove") {
-        waypoints.splice(acao.index, 0, acao.latlng);
-        const marker = L.marker(acao.latlng).addTo(map);
-        marker.bindPopup(`
-            <b>Waypoint</b><br>
-            <button class="btn-remover">Remover</button>
-        `);
-        marker.on("popupopen", () => {
-            const btn = document.querySelector(".btn-remover");
-            if (btn) {
-                btn.onclick = () => {
-                    removerWaypointPorCoordenada(acao.latlng);
-                };
-            }
-        });
-
-        waypointMarkers.splice(acao.index, 0, marker);
-        atualizarUrlComWaypoints();
-        buscarERotear();
-    }
-
-    redoStack.push(acao);
-}
-
-function refazerWaypoint() {
-    const acao = redoStack.pop();
-    if (!acao) return;
-
-    if (acao.tipo === "add") {
-        adicionarWaypoint(acao.latlng); // já registra no histórico
-    } else if (acao.tipo === "remove") {
-        const index = waypoints.findIndex(wp => wp.lat === acao.latlng.lat && wp.lng === acao.latlng.lng);
-        if (index !== -1) {
-            removerWaypoint(index); // já registra no histórico
-        }
-    }
 }
 
 // Funções para salvar e carregar waypoints da URL
@@ -427,76 +464,79 @@ function atualizarUrlComWaypoints() {
 
 function carregarWaypointsDaUrl() {
     const params = new URLSearchParams(window.location.search);
-    const coordsString = params.get('waypoints');
-    if (coordsString) {
-        const coordsArray = coordsString.split(';');
-        coordsArray.forEach(coord => {
-            const [lat, lng] = coord.split(',').map(Number);
-            if (!isNaN(lat) && !isNaN(lng)) {
-                waypoints.push({lat, lng});
-                const marker = L.marker({lat, lng}).addTo(map);
-                marker.bindPopup(`
-                    <b>Waypoint</b><br>
-                    <button onclick="removerWaypoint(${waypoints.length - 1})">Remover</button>
-                `);
-                waypointMarkers.push(marker);
-            }
-        });
-    }
+    const coordsString = params.get('waypoints') || params.get('wps');
+    if (!coordsString) return;
+    const coordsArray = coordsString.split(';').map(s => s.trim()).filter(Boolean);
+    coordsArray.forEach(coord => {
+        const [lat, lng] = coord.split(',').map(Number);
+        if (!isNaN(lat) && !isNaN(lng)) {
+            adicionarWaypoint({lat, lng});
+        }
+    });
 }
 
 // Funções de geração e controle do QR Code
 function gerarQRCode() {
     const qrcodeElement = document.getElementById("qrcode");
     const content = document.getElementById("qrcode-content");
-
-    if (qrcodeElement) {
+    if (qrcodeElement && content) {
         qrcodeElement.innerHTML = '';
         const urlDaRota = window.location.href;
         new QRCode(qrcodeElement, urlDaRota);
-
-        // Garante que o conteúdo apareça
         content.classList.remove("esconder");
     }
 }
 
-// Waypoints
 function adicionarWaypoint(latlng) {
-    if (waypoints.some(wp => wp.lat === latlng.lat && wp.lng === latlng.lng)) {
-        return;
-    }
+    const p = { lat: Number(latlng.lat), lng: Number(latlng.lng) };
+    if (waypoints.some(wp => latLngEquals(wp, p))) return;
 
-    waypoints.push(latlng);
-    const marker = L.marker(latlng).addTo(map);
+    waypoints.push(p);
+    const marker = L.marker([p.lat, p.lng], { draggable: true }).addTo(map);
     waypointMarkers.push(marker);
 
-    // O código do pop-up será corrigido no próximo passo
-    marker.bindPopup(`<b>Waypoint</b><br><button onclick="removerWaypoint(${waypoints.length - 1})">Remover</button>`);
+    const novoIndex = waypoints.findIndex(wp => latLngEquals(wp, p));
 
-    // A função de rota deve ser chamada aqui
-    buscarERotear();
+    marker.bindPopup(`
+        <b>Waypoint</b><br>
+        <button class="btn-remover-popup" data-index="${novoIndex}">Remover</button>
+    `);
+
+    marker.on("popupopen", (e) => {
+        const btn = e.popup.getElement().querySelector(`[data-index="${novoIndex}"]`);
+        if (btn) {
+            btn.onclick = (e) => {
+                const indexParaRemover = parseInt(e.target.dataset.index);
+                removerWaypoint(indexParaRemover);
+            };
+        }
+    });
+
+    marker.on("dragend", function() {
+        const newPos = marker.getLatLng();
+        const idx = waypointMarkers.indexOf(marker);
+        if (idx !== -1) {
+            waypoints[idx] = { lat: newPos.lat, lng: newPos.lng };
+            atualizarUrlComWaypoints();
+            buscarERotear();
+        }
+    });
+
+    if (userMarker) {
+        buscarERotear();
+    } else {
+        mostrarSugestao("Aguardando sua localização para traçar a rota...");
+    }
     atualizarUrlComWaypoints();
 }
 
-function atualizarURLWaypoints(waypoints) {
-    const url = new URL(window.location);
-    // Salva os waypoints como JSON no parâmetro "wps"
-    url.searchParams.set('wps', JSON.stringify(waypoints));
-    window.history.replaceState({}, '', url);
-}
-
-function obterWaypointsDoURL() {
-    const url = new URL(window.location);
-    const wps = url.searchParams.get('wps');
-    return wps ? JSON.parse(wps) : [];
-}
-
 function removerWaypoint(index, registrarHistorico = true) {
-    if (waypointMarkers[index]) {
-        map.removeLayer(waypointMarkers[index]);
-    }
+    if (index < 0 || index >= waypoints.length) return;
 
     const removido = waypoints[index];
+    const marker = waypointMarkers[index];
+
+    if (marker && map.hasLayer(marker)) map.removeLayer(marker);
     waypointMarkers.splice(index, 1);
     waypoints.splice(index, 1);
 
@@ -508,105 +548,22 @@ function removerWaypoint(index, registrarHistorico = true) {
     if (rotaLayer) {
         map.removeLayer(rotaLayer);
         rotaLayer = null;
+        rotaPolyline = null;
     }
 
-    if (waypoints.length > 0) {
+    if (waypoints.length > 0 && userMarker) {
         buscarERotear();
     } else {
-        document.getElementById("qrcode-content").classList.add("esconder");
+        const qrc = document.getElementById("qrcode-content");
+        if (qrc) qrc.classList.add("esconder");
     }
 
     atualizarUrlComWaypoints();
-
-    // ✅ O segredo para o botão de remoção funcionar
-    // Percorre todos os marcadores que sobraram e atualiza o popup deles
-    waypointMarkers.forEach((marker, newIndex) => {
-        marker.bindPopup(`
-            <b>Waypoint</b><br>
-            <button class="btn-remover-popup" data-index="${newIndex}">Remover</button>
-        `);
-        marker.on("popupopen", () => {
-            const btn = document.querySelector(".btn-remover-popup");
-            if (btn) {
-                btn.onclick = (e) => {
-                    const indexParaRemover = parseInt(e.target.dataset.index);
-                    removerWaypoint(indexParaRemover);
-                };
-            }
-        });
-    });
 }
 
-function atualizarIndicesDosPopups() {
-    waypointMarkers.forEach((marker, index) => {
-        if (marker._popup) {
-            const novoPopupHtml = `
-                <b>Waypoint</b><br>
-                <button class="btn-remover-popup" data-index="${index}">Remover</button>
-            `;
-            marker.setPopupContent(novoPopupHtml);
-        }
-    });
-}
-
-// Essa é a função que adiciona um waypoint e cria o pop-up
-// Na sua função adicionarWaypoint
-function adicionarWaypoint(latlng) {
-    if (waypoints.some(wp => wp.lat === latlng.lat && wp.lng === latlng.lng)) {
-        return;
-    }
-    
-    // Adiciona o waypoint na lista
-    waypoints.push(latlng);
-    
-    // Cria o marcador e o adiciona no mapa e na lista de marcadores
-    const marker = L.marker(latlng).addTo(map);
-    waypointMarkers.push(marker);
-
-    // Encontra o índice do waypoint recém-adicionado
-    const novoIndex = waypoints.findIndex(wp => wp.lat === latlng.lat && wp.lng === latlng.lng);
-
-    // Cria o pop-up com o botão de remover
-    marker.bindPopup(`
-        <b>Waypoint</b><br>
-        <button class="btn-remover-popup" data-index="${novoIndex}">Remover</button>
-    `);
-
-    // Adiciona o ouvinte de evento para o botão de remover
-    marker.on("popupopen", () => {
-        const btn = document.querySelector(".btn-remover-popup");
-        if (btn) {
-            btn.onclick = (e) => {
-                const indexParaRemover = parseInt(e.target.dataset.index);
-                removerWaypoint(indexParaRemover);
-            };
-        }
-    });
-
-    // Chama as funções para traçar a rota e atualizar a URL
-    buscarERotear();
-    atualizarUrlComWaypoints();
-}
-
-// Essa função já está correta, mas a chamamos no lugar certo agora.
-function atualizarUrlComWaypoints() {
-    const coordsString = waypoints.map(p => `${p.lat},${p.lng}`).join(';');
-    const novaUrl = new URL(window.location.href);
-    if (coordsString) {
-        novaUrl.searchParams.set('waypoints', coordsString);
-    } else {
-        novaUrl.searchParams.delete('waypoints');
-    }
-    window.history.replaceState({}, '', novaUrl);
-    gerarQRCode();
-}
-
-// Função para buscar as coordenadas de um endereço
-// ======= Geocoding robusto (Nominatim) =======
 function buscarCoordenadas(endereco) {
     const query = encodeURIComponent(endereco);
     const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&limit=6&q=${query}`;
-
     return fetch(url)
         .then(res => {
             if (!res.ok) throw new Error(`Erro no geocoder: ${res.status}`);
@@ -614,105 +571,45 @@ function buscarCoordenadas(endereco) {
         })
         .then(data => {
             if (!data || data.length === 0) throw new Error("Endereço não encontrado.");
-
             const inputLower = endereco.toLowerCase();
             const hasNumber = /\d+/.test(endereco);
-
-            // Pontua cada candidato
             const scored = data.map(d => {
                 return Object.assign({}, d, { score: scoreCandidate(d, inputLower, hasNumber) });
             }).sort((a, b) => b.score - a.score);
-
             const best = scored[0];
-
-            // se confiança muito baixa, ainda assim retorna, mas loga para debug
             if (best.score < 30) {
                 console.warn('Baixa confiança no geocode:', scored.map(s => ({ name: s.display_name, score: s.score })));
             }
-
             return {
                 lat: Number(best.lat),
                 lng: Number(best.lon),
                 raw: best,
-                alternatives: scored.slice(1, 4) // até 3 alternativas
+                alternatives: scored.slice(1, 4)
             };
         });
 }
 
-async function otimizarRota(waypoints) {
-  const body = {
-    jobs: waypoints.map((wp, i) => ({
-      id: i + 1,
-      location: [wp.lng, wp.lat]
-    })),
-    vehicles: [{
-      id: 1,
-      profile: "driving-car",
-      start: [userMarker.getLatLng().lng, userMarker.getLatLng().lat]
-    }]
-  };
-
-  const res = await fetch("api.openrouteservice.org/v2/directions", {
-    method: "POST",
-    headers: {
-      "Authorization": chave_api,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
-
-    const data = await res.json();
-    console.log(data);
-
-    // A resposta traz a ordem ótima dos jobs
-    const ordemOtima = data.routes[0].steps.map(step => {
-        const job = body.jobs.find(j => j.id === step.job);
-        return { lat: job.location[1], lng: job.location[0] };
-    });
-
-    return ordemOtima;
-}
-
-
 function scoreCandidate(d, inputLower, hasNumber) {
     const ad = d.address || {};
     let s = 0;
-
-    // número da casa é prioridade alta
     if (hasNumber && (ad.house_number || /\b\d+\b/.test(d.display_name))) s += 60;
-
-    // rua exata
     if (ad.road && inputLower.includes(ad.road.toLowerCase())) s += 30;
-
-    // cidade/bairro
     if (ad.city && inputLower.includes(ad.city.toLowerCase())) s += 25;
     if (ad.town && inputLower.includes(ad.town.toLowerCase())) s += 20;
     if (ad.suburb && inputLower.includes(ad.suburb.toLowerCase())) s += 10;
-
-    // palavras-chave comuns para POIs de saúde
     const poiKeywords = ['upa','hospital','pronto atendimento','pronto-atendimento','posto de saúde','clinica','clínica','posto'];
     if (d.class === 'amenity' && poiKeywords.some(k => inputLower.includes(k))) s += 40;
     if ((d.display_name || '').toLowerCase().split(',').some(p => poiKeywords.some(k => p.includes(k)))) s += 20;
-
-    // preferir nodes (pontos) sobre áreas muito grandes (cidades/regiões)
     if (d.osm_type === 'node') s += 10;
-
-    // bbox muito pequena -> ponto específico
     if (d.boundingbox) {
         const bb = d.boundingbox.map(Number);
         const area = Math.abs((bb[2] - bb[0]) * (bb[3] - bb[1]));
         if (area < 0.001) s += 10;
     }
-
-    // importância fornecida pelo Nominatim
     if (d.importance) s += Math.round(d.importance * 10);
-
-    // match exato do display_name (muito forte)
     if ((d.display_name || '').toLowerCase() === inputLower) s += 50;
-
     return s;
 }
-
 
 function adicionarEndereco() {
     const endereco = document.getElementById('endereco').value;
@@ -720,15 +617,11 @@ function adicionarEndereco() {
         alert("Por favor, digite um endereço.");
         return;
     }
-
-    salvarUltimaPesquisa(endereco); // <-- novo
+    salvarUltimaPesquisa(endereco);
     showloadscreen();
-
     buscarCoordenadas(endereco)
         .then(({ lat, lng, alternatives }) => {
             adicionarWaypoint({ lat, lng });
-
-            // mostra alternativas no mapa
             alternatives.forEach(a => {
                 const circle = L.circleMarker([a.lat, a.lon], { radius: 6, weight: 1, opacity: 0.8 }).addTo(map);
                 circle.bindPopup(`Alternativa: ${a.display_name} (score ${a.score})`);
@@ -736,7 +629,6 @@ function adicionarEndereco() {
                     if (map.hasLayer(circle)) map.removeLayer(circle);
                 }, 7000);
             });
-
             map.panTo([lat, lng]);
         })
         .catch(error => {
@@ -751,12 +643,10 @@ input.addEventListener("input", function() {
     const query = input.value.trim();
     const container = document.getElementById("sugestoes-proximas");
     if (!container) return;
-
     if (query.length < 3) {
         container.innerHTML = "";
         return;
     }
-
     fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`)
         .then(res => res.json())
         .then(data => {
@@ -774,19 +664,6 @@ input.addEventListener("input", function() {
         });
 });
 
-// Evento que desativa o foco da câmera quando o usuário arrasta o mapa
-map.on('movestart', function() {
-    followUser = false;
-    clearTimeout(followTimeout); 
-    followTimeout = setTimeout(function() {
-        followUser = true;
-        if (userMarker) {
-            map.panTo(userMarker.getLatLng());
-        }
-    }, 15000);
-});
-
-// Monitoramento do usuário
 if (navigator.geolocation) {
     showloadscreen();
     navigator.geolocation.watchPosition(pos => {
@@ -802,144 +679,251 @@ if (navigator.geolocation) {
                 buscarERotear();
                 rotaInicialCarregada = true;
             }
-        } else {
-            userMarker.setLatLng(userLatLng);
-            if (followUser) {
-                map.panTo(userLatLng);
-            }
+            return;
         }
 
-        // Novas regras para monitorar se está fora da rota e atualizar rota percorrida
-        if (rotaPolyline) {
-            const pontos = coletarPontosDaRota();
-            const snapObj = encontrarProximoPontoNaRota(userLatLng, pontos);
+        // Atualiza posição do marcador (sempre)
+        userMarker.setLatLng(userLatLng);
+        // sempre centraliza o aviãozinho no centro da tela (animação suave)
+        map.panTo(userLatLng, { animate: true, duration: 0.25 });
 
-            if (snapObj.ponto) {
-                const distancia = snapObj.distancia;
 
-                // Se estiver muito longe do ponto mais próximo da rota -> recalcular
-                if (distancia > 30) {
-                    if (!recalculando && waypoints.length > 0) {
-                        recalculando = true;
-                        userMarker.setLatLng(userLatLng);
-                        buscarERotear();
-                        setTimeout(() => { recalculando = false; }, 15000);
-                    } else {
-                        userMarker.setLatLng(userLatLng);
-                    }
-                } else {
-                    // Ainda está dentro da rota -> snap no ponto mais próximo
-                    animateMarker(userMarker, snapObj.ponto, 500); // <-- CORREÇÃO AQUI
-                    userPath.addLatLng(snapObj.ponto);
+        // Se não há rota desenhada, apenas sai
+        if (!rotaPolyline) {
+            // Mas, se já temos waypoints e não estamos recalculando, tenta traçar rota
+            if (waypoints.length > 0 && !recalculando) {
+                recalculando = true;
+                mostrarSugestao("Recalculando rota...");
+                buscarERotear().finally(() => { recalculando = false; });
+            }
+            return;
+        }
 
-                    // Atualiza a rota para remover a parte já percorrida
-                    atualizarRotaRestante(pontos, snapObj.index);
+        // Coleta pontos da rota (array com {lat,lng})
+        const pontos = coletarPontosDaRota();
+        if (!pontos || pontos.length === 0) return;
 
-                    // Rotaciona o ícone em direção ao próximo ponto
-                    const nextPoint = pontos[snapObj.index + 1] || pontos[snapObj.index];
-                    if (nextPoint) {
-                        const angulo = calcularAnguloEntreDoisPontos(snapObj.ponto, nextPoint);
+        // Calcula distancia mínima do usuário até a polyline (em metros)
+        const distObj = distanciaMinimaPolyline(userLatLng, pontos);
+
+        // threshold em metros para considerar "desvio"
+        const THRESHOLD_METROS = 30;
+
+        if (distObj.distance > THRESHOLD_METROS) {
+            // usuário saiu da rota
+            if (!recalculando && waypoints.length > 0) {
+                recalculando = true;
+                mostrarSugestao("Você se desviou — recalculando rota...");
+                // chama buscarERotear e garante que recalculando só volta a false quando terminar
+                buscarERotear().finally(() => { 
+                    recalculando = false;
+                    // pequena pausa antes de permitir novo recálculo
+                    setTimeout(()=>{ /* nada */ }, 500);
+                });
+            }
+        } else {
+                // Ainda próximo o suficiente -> fazemos snap preditivo + trail
+                const snapInfo = snapPredict(userLatLng, pontos, { lookaheadMeters: SNAP_LOOKAHEAD });
+
+                if (snapInfo) {
+                    // se estiver perto o suficiente, garantir trail ativo
+                    if (snapInfo.distanceToRoute <= THRESHOLD_METROS) {
+                        if (!isTrailActive) startRouteTrail();       // mostra trail quando começa a seguir
+                        // anima até ponto previsto e registra no trail
+                        animateMarker(userMarker, snapInfo.snapPoint, SNAP_SMOOTH_MS);
+                        addPointToRouteTrail(snapInfo.snapPoint);
+                        // orienta o avião para a headingPoint
+                        const angulo = calcularAnguloEntreDoisPontos(snapInfo.snapPoint, snapInfo.headingPoint);
                         const el = userMarker.getElement && userMarker.getElement();
                         const iconDiv = el && el.querySelector && el.querySelector('.user-icon');
                         if (iconDiv) iconDiv.style.transform = `rotate(${angulo}deg)`;
+                        // atualiza rota restante visualmente
+                        atualizarRotaRestante(pontos, snapInfo.snapIndex);
+                    } else {
+                        // caso estranho: snapInfo existe mas estamos além do threshold -> esconder trail
+                        if (isTrailActive) hideRouteTrail();
                     }
+                } else {
+                    // sem snapInfo — esconder trail por segurança
+                    if (isTrailActive) hideRouteTrail();
                 }
             }
-
-        } else if (instrucoesRota.length > 0 && proximaInstrucaoIndex < instrucoesRota.length) {
-            // fallback para rotas com instruções (caso rotaPolyline esteja undefined)
-            const instr = instrucoesRota[proximaInstrucaoIndex];
-
-            if (instr && instr.location) {
-                const d = calcularDistancia(lat, lon, instr.location[1], instr.location[0]);
-                mostrarSugestao(`${instr.instruction} em ${Math.round(d)}m`);
-                if (d < 10) proximaInstrucaoIndex++;
-            }
-        }
-
     }, erro => { alert("Não foi possível obter sua localização."); hideload(); }, {
         enableHighAccuracy: true,
         maximumAge: 0,
         timeout: 10000
     });
-} else { 
-    alert("Navegador não suporta geolocalização."); 
-    hideload(); 
+} else {
+    alert("Navegador não suporta geolocalização.");
+    hideload();
 }
 
-// Clique no mapa adiciona waypoint
 map.on('click', e => adicionarWaypoint(e.latlng));
 
-carregarWaypointsDaUrl();
-
-// ---------- garantir função mostrarSugestao (se já existir, ignora) ----------
-if (typeof mostrarSugestao !== "function") {
-  function mostrarSugestao(texto) {
-    const el = document.getElementById("texto-sugestao");
-    if (el) el.innerText = texto;
-  }
-}
-
-// ---------- logs simples para depuração ----------
-console.log("Debug: script carregado - listener de rotas ativo.");
-
-// console.log("buscarERotear chamado. waypoints:", waypoints.length);
-
-if (typeof routingControl !== "undefined" && routingControl && routingControl.on) {
-  routingControl.on('routesfound', function(e) {
-    console.log("Debug: routingControl routesfound event", e);
-
-    const route = e.routes && e.routes[0];
-    if (!route) {
-      mostrarSugestao("Rota encontrada, mas sem dados.");
-      return;
-    }
-
-    // tenta extrair a instrução de forma robusta (vários formatos possíveis)
-    let textoInstrucao = "Rota calculada";
-    // 1) formato LRM: route.instructions ou route.routes[0].instructions
-    if (route.instructions && route.instructions.length) {
-      const instr = route.instructions[0];
-      textoInstrucao = instr.text || instr.instruction || textoInstrucao;
-    } else if (route.routes && route.routes[0] && route.routes[0].instructions && route.routes[0].instructions.length) {
-      const instr = route.routes[0].instructions[0];
-      textoInstrucao = instr.text || instr.instruction || textoInstrucao;
-    } else if (route.legs && route.legs.length) {
-      // fallback: pega primeira step
-      const leg = route.legs[0];
-      if (leg.steps && leg.steps.length) {
-        const step = leg.steps[0];
-        const m = step.maneuver || {};
-        textoInstrucao = (step.name ? `${step.name} — ` : '') + (m.instruction || step.instruction || step.name || "Siga em frente");
-      }
-    }
-
-    mostrarSugestao(textoInstrucao);
-  });
-}
-
 function _postProcessarRotaLocal() {
-  try {
-    if (instrucoesRota && instrucoesRota.length > 0) {
-      mostrarSugestao(instrucoesRota[0].instruction || "Siga em frente");
-    } else {
-      mostrarSugestao("Rota calculada, sem instruções detalhadas.");
+    try {
+        if (instrucoesRota && instrucoesRota.length > 0) {
+            mostrarSugestao(instrucoesRota[0].instruction || "Siga em frente");
+        } else {
+            mostrarSugestao("Rota calculada, sem instruções detalhadas.");
+        }
+    } catch (e) {
+        console.warn("Debug: erro em _postProcessarRotaLocal", e);
+        mostrarSugestao("Rota calculada.");
     }
-  } catch (e) {
-    console.warn("Debug: erro em _postProcessarRotaLocal", e);
-    mostrarSugestao("Rota calculada.");
-  }
 }
 
-// ---------- debug extra para ver quando a polyline muda ----------
-const origAddLayer = L.LayerGroup.prototype.addLayer;
-L.LayerGroup.prototype.addLayer = function(layer) {
-  try {
-    if (layer instanceof L.Polyline) {
-        console.log("Debug: uma polyline foi adicionada ao LayerGroup -> atualizando sugestão.");
-        // se proximaInstrucaoIndex e instrucoesRota existirem, tenta mostrar
-        if (typeof _postProcessarRotaLocal === "function") _postProcessarRotaLocal();
+// ========== Substitua / adicione estas funções ==========
+
+// calcula distância total de uma rota (soma de segmentos)
+function rotaDistancia(route) {
+    let s = 0;
+    for (let i = 0; i < route.length - 1; i++) {
+        s += calcularDistancia(route[i], route[i+1]);
     }
-  } catch (e) { /* ignore */ }
-  return origAddLayer.call(this, layer);
-};
+    return s;
+}
+
+// 2-opt (melhora local) — cuidado: O(n^2) por iteração, bom para <= 30 pontos.
+function twoOpt(route) {
+    if (!Array.isArray(route) || route.length < 3) return route.slice();
+    let best = route.slice();
+    let improved = true;
+    const maxIter = 500; // evita loop infinito em casos extremos
+    let iter = 0;
+
+    while (improved && iter < maxIter) {
+        improved = false;
+        iter++;
+        const n = best.length;
+        for (let i = 0; i < n - 2; i++) {
+            for (let k = i + 1; k < n - 1; k++) {
+                // cria nova rota trocando o segmento (i+1..k)
+                const newRoute = best.slice(0, i+1)
+                    .concat(best.slice(i+1, k+1).reverse())
+                    .concat(best.slice(k+1));
+                if (rotaDistancia(newRoute) + 1e-6 < rotaDistancia(best)) {
+                    best = newRoute;
+                    improved = true;
+                }
+            }
+            if (improved) break;
+        }
+    }
+    return best;
+}
+
+/*
+  reordenarWaypointsOtimizada(listaWaypoints, startPoint, aplicar2opt = true)
+
+  - listaWaypoints: array de {lat,lng}
+  - startPoint: opcional, objeto {lat,lng} (ex: userMarker.getLatLng()) — a otimização parte deste ponto
+  - retorna um ARRAY NOVO com os waypoints ordenados (não inclui o startPoint)
+*/
+function reordenarWaypointsOtimizada(listaWaypoints, startPoint = null, aplicar2opt = true) {
+    if (!Array.isArray(listaWaypoints) || listaWaypoints.length <= 1) return listaWaypoints.slice();
+
+    // clone e normaliza
+    const restantes = listaWaypoints.map(p => ({ lat: Number(p.lat), lng: Number(p.lng) }));
+    const rota = [];
+    let atual;
+
+    if (startPoint && startPoint.lat !== undefined && startPoint.lng !== undefined) {
+        atual = { lat: Number(startPoint.lat), lng: Number(startPoint.lng) };
+    } else {
+        // se não foi informado start, começa do primeiro waypoint da lista (comportamento legacy)
+        atual = restantes.shift();
+        rota.push(atual);
+    }
+
+    while (restantes.length > 0) {
+        let idxNearest = 0;
+        let minD = calcularDistancia(atual, restantes[0]);
+        for (let i = 1; i < restantes.length; i++) {
+            const d = calcularDistancia(atual, restantes[i]);
+            if (d < minD) { minD = d; idxNearest = i; }
+        }
+        const next = restantes.splice(idxNearest, 1)[0];
+        rota.push(next);
+        atual = next;
+    }
+
+    // rota contém a sequência de waypoints na ordem encontrada.
+    // Se foi passado startPoint, rota[0] é o waypoint mais próximo do startPoint.
+    if (aplicar2opt && rota.length > 2) {
+        return twoOpt(rota);
+    }
+    return rota;
+}
+
+
+async function buscarERotear() {
+    // controla flag para evitar concorrência
+    recalculando = true;
+    showloadscreen();
+
+    if (!userMarker) {
+        hideload();
+        recalculando = false;
+        mostrarSugestao("Aguardando sua localização...");
+        return;
+    }
+    
+    if (waypoints.length === 0) {
+        hideload();
+        if (rotaLayer) {
+            map.removeLayer(rotaLayer);
+            rotaLayer = null;
+            rotaPolyline = null;
+        }
+        mostrarSugestao("Adicione waypoints para traçar a rota.");
+        return;
+    }
+
+    // otimiza os waypoints PARTINDO da posição do usuário
+    const waypointsOtimizados = reordenarWaypointsOtimizada(waypoints, userMarker.getLatLng(), true);
+
+
+    // ✅ Rota começa do usuário e vai pros waypoints otimizados
+    const coordenadas = [userMarker.getLatLng(), ...waypointsOtimizados]
+        .map(wp => `${wp.lng},${wp.lat}`)
+        .join(';');
+    
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordenadas}?overview=full&alternatives=false&steps=true&geometries=geojson`;
+
+    try {
+        const resposta = await fetch(url);
+        if (!resposta.ok) throw new Error(`Erro HTTP: ${resposta.status}`);
+        const dados = await resposta.json();
+        const rota = dados.routes[0];
+        if (rota) {
+            if (rotaLayer) {
+                map.removeLayer(rotaLayer);
+                rotaLayer = null;
+            }
+            if (rotaPolyline) {
+                map.removeLayer(rotaPolyline);
+                rotaPolyline = null;
+            }
+            const polyline = rota.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+            rotaPolyline = L.polyline(polyline, { color: 'blue', weight: 6 });
+            rotaLayer = L.layerGroup().addTo(map);
+            rotaLayer.addLayer(rotaPolyline);
+            map.fitBounds(rotaPolyline.getBounds());
+            instrucoesRota = [];
+            rota.legs.forEach(leg => {
+                if (leg.steps) {
+                    instrucoesRota = instrucoesRota.concat(leg.steps);
+                }
+            });
+            proximaInstrucaoIndex = 0;
+            _postProcessarRotaLocal();
+        }
+    } catch (erro) {
+        console.error("Erro ao traçar a rota:", erro);
+        mostrarSugestao("Não foi possível traçar a rota. Tente novamente.");
+    } finally {
+        hideload();
+        recalculando = false;
+    }
+}
