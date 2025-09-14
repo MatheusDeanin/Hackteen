@@ -148,6 +148,17 @@ hr {
 }
 
 @media (max-width: 600px) {
+    .utilizacao {
+        padding: 20px;
+        justify-content: center;
+        display: block;
+    }
+
+    .utilizacao .celular {
+        width: 300px;
+        justify-items: center;
+    }
+
     .texto-imagem {
         display: block;
         height: 760px;

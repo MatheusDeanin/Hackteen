@@ -354,7 +354,7 @@ input#endereco {
 
     .Buscar {
         padding: 0;
-        width: 13px;
+        width: 100px;
         font-size: 13px;
     }
 
@@ -375,8 +375,12 @@ input#endereco {
         margin-left: 37%;
     }
 
+    #form-container {
+        margin-left: 5%;
+    }
+
     #sugestoes-ultimas, #sugestoes-proximas {
-        width: 90vw;
+        width: 76vw;
         right: 0;
         left: 5vw;
     }
