@@ -34,6 +34,45 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 });
 
+// Carrega os waypoints salvos no localStorage, se existirem
+document.addEventListener("DOMContentLoaded", function() {
+    const savedWaypoints = localStorage.getItem('tempWaypoints');
+    if (savedWaypoints) {
+        // Converte os dados de volta para um array
+        waypoints = JSON.parse(savedWaypoints);
+
+        // Adiciona os marcadores no mapa e traça a rota
+        waypoints.forEach(wp => {
+            const marker = L.marker(wp).addTo(map);
+            waypointMarkers.push(marker);
+            // Encontra o índice do waypoint recém-adicionado
+            const novoIndex = waypoints.findIndex(wp => wp.lat === latlng.lat && wp.lng === latlng.lng);
+
+            // Cria o pop-up usando um atributo de dado para o índice
+            marker.bindPopup(`
+                <b>Waypoint</b><br>
+                <button class="btn-remover-popup" data-index="${novoIndex}">Remover</button>
+            `);
+
+            // Adiciona um listener de evento ao botão do pop-up
+            marker.on("popupopen", () => {
+                const btn = document.querySelector(".btn-remover-popup");
+                if (btn) {
+                    btn.onclick = (e) => {
+                        // Pega o índice do atributo de dado e o converte para um número
+                        const indexParaRemover = parseInt(e.target.dataset.index);
+                        // Chama a função de remoção com o índice correto
+                        removerWaypoint(indexParaRemover);
+                    };
+                }
+            });
+        });
+
+        // Chama a função que traça a rota
+        buscarERotear();
+    }
+});
+
 // Configuração de chave
 const chave_api = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImE0NmE3ZjdkZGFiODQ0NGI4Y2Q3MmE3YjIyNWM3MTlkIiwiaCI6Im11cm11cjY0In0=";
 
@@ -78,6 +117,7 @@ let proximaInstrucaoIndex = 0;
 let recalculando = false;
 let followUser = true;
 let followTimeout;
+let polylineload = []
 let rotaInicialCarregada = false;
 
 const map = L.map('map').setView([-23.5505, -46.6333], 13);
@@ -93,7 +133,6 @@ function salvarUltimaPesquisa(endereco) {
     ultimas = ultimas.filter(e => e !== endereco);
     ultimas.unshift(endereco);
     ultimas = ultimas.slice(0, 3);
-    localStorage.setItem("ultimasPesquisas", JSON.stringify(ultimas));
     atualizarSugestoes();
 }
 
@@ -148,15 +187,23 @@ function flattenLatLngs(latlngs) {
     return out;
 }
 
-function calcularDistancia(lat1, lon1, lat2, lon2) {
-    const R = 6371e3;
-    const latitude1 = lat1 * Math.PI/180;
-    const latitude2 = lat2 * Math.PI/180;
-    const diferencaLatitude = (lat2-lat1) * Math.PI/180;
-    const diferencaLongitude = (lon2-lon1) * Math.PI/180;
+// Função para calcular a distância entre dois pontos (haversine)
+function calcularDistancia(ponto1, ponto2) {
+    const toRad = (valor) => (valor * Math.PI) / 180;
+    const lat1 = toRad(ponto1.lat);
+    const lon1 = toRad(ponto1.lng);
+    const lat2 = toRad(ponto2.lat);
+    const lon2 = toRad(ponto2.lng);
+    const R = 6371e3; // Raio da Terra em metros
 
-    const a = Math.sin(diferencaLatitude/2)**2 + Math.cos(latitude1)*Math.cos(latitude2)*Math.sin(diferencaLongitude/2)**2;
-    const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const deltaLat = lat2 - lat1;
+    const deltaLon = lon2 - lon1;
+
+    const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+        Math.cos(lat1) * Math.cos(lat2) *
+        Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
     return R * c;
 }
 
@@ -221,102 +268,66 @@ function mostrarSugestao(texto) {
 }
 
 // Função robusta de buscar e rotear (OSRM)
-async function buscarERotear() {
-    try {
-        // Precauções iniciais
-        if (!userMarker) {
-            console.warn('buscarERotear: userMarker ainda não definido — aguardando posição do usuário.');
-            mostrarSugestao("Aguardando posição do usuário...");
-            return;
-        }
-
-        if (!waypoints || waypoints.length === 0) {
-            // limpa rota anterior
-            if (rotaLayer) { map.removeLayer(rotaLayer); rotaLayer = null; }
-            if (rotaPolyline) { map.removeLayer(rotaPolyline); rotaPolyline = null; }
-            instrucoesRota = [];
-            mostrarSugestao("Nenhum waypoint definido.");
-            return;
-        }
-
-        // Indica que a rota está sendo calculada
-        mostrarSugestao("Aguardando rota...");
-
-        // Monta coordenadas (start = usuário)
-        const start = userMarker.getLatLng();
-        const coordsArr = [start].concat(waypoints.map(w => L.latLng(w.lat, w.lng)));
-        const coordsStr = coordsArr.map(p => `${p.lng},${p.lat}`).join(';');
-
-        const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true`;
-
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Erro na API de rotas (status ${res.status})`);
-        const data = await res.json();
-        if (!data.routes || !data.routes.length) throw new Error('Nenhuma rota retornada pelo servidor de roteamento.');
-
-        const route = data.routes[0];
-
-        // Extrai coordenadas da geometria (suporta GeoJSON LineString)
-        let latlngs = [];
-        if (route.geometry && route.geometry.coordinates) {
-            latlngs = flattenLatLngs(route.geometry.coordinates);
-        } else if (route.geometry && route.geometry.type === 'LineString' && route.geometry.coordinates) {
-            latlngs = flattenLatLngs(route.geometry.coordinates);
-        } else {
-            throw new Error('Geometria da rota inesperada.');
-        }
-
-        // Remove rota anterior (se existir)
-        if (rotaLayer) { map.removeLayer(rotaLayer); rotaLayer = null; }
-        if (rotaPolyline) { map.removeLayer(rotaPolyline); rotaPolyline = null; }
-
-        // Cria nova polyline (rotaPolyline deve ser a polyline)
-        rotaPolyline = L.polyline(latlngs, { color: '#3388ff', weight: 6 });
-
-        // Criar um layerGroup que contenha a polyline (mantém compatibilidade com seu código)
-        rotaLayer = L.layerGroup().addTo(map);
-        rotaLayer.addLayer(rotaPolyline);
-
-        // Ajusta view (sem zoom brutal)
-        try { map.fitBounds(rotaPolyline.getBounds(), { padding: [50, 50] }); } catch (e) { /* ignore */ }
-
-        // Extrai instruções (steps) para fallback / UI
-        instrucoesRota = [];
-        if (route.legs && Array.isArray(route.legs)) {
-            route.legs.forEach(leg => {
-                if (leg.steps && Array.isArray(leg.steps)) {
-                    leg.steps.forEach(step => {
-                        const m = step.maneuver || {};
-                        const instrText = (step.name ? `${step.name} — ` : '') +
-                                          (m.instruction || `${m.type || ''} ${m.modifier || ''}`).trim();
-                        instrucoesRota.push({
-                            instruction: instrText || 'Siga em frente',
-                            location: [
-                                m.location ? m.location[1] : (step.geometry && step.geometry.coordinates && step.geometry.coordinates[0] ? step.geometry.coordinates[0][1] : null),
-                                m.location ? m.location[0] : (step.geometry && step.geometry.coordinates && step.geometry.coordinates[0] ? step.geometry.coordinates[0][0] : null)
-                            ],
-                            distance: step.distance,
-                            duration: step.duration
-                        });
-                    });
-                }
-            });
-        }
-
-        proximaInstrucaoIndex = 0;
-
-        // Mostra primeira instrução (ou fallback)
-        if (instrucoesRota.length > 0) {
-            mostrarSugestao(instrucoesRota[0].instruction);
-        } else {
-            mostrarSugestao("Rota calculada, sem instruções detalhadas.");
-        }
-
-    } catch (err) {
-        console.error('buscarERotear erro:', err);
-        mostrarSugestao("Erro ao calcular rota.");
-        alert('Erro ao calcular rota: ' + (err.message || err));
+// ✅ Versão corrigida: Reordena os waypoints de forma otimizada
+function reordenarWaypointsOtimizada(listaWaypoints) {
+    if (listaWaypoints.length <= 1) {
+        return listaWaypoints;
     }
+
+    let rotaOtimizada = [];
+    let pontosRestantes = [...listaWaypoints];
+    
+    // Inicia a rota com o primeiro ponto, que é o ponto de partida
+    let pontoAtual = pontosRestantes.shift(); 
+    rotaOtimizada.push(pontoAtual);
+
+    while (pontosRestantes.length > 0) {
+        let proximoPonto = null;
+        let menorDistancia = Infinity;
+        let indexDoProximoPonto = -1;
+
+        for (let i = 0; i < pontosRestantes.length; i++) {
+            const distancia = calcularDistancia(pontoAtual, pontosRestantes[i]);
+            if (distancia < menorDistancia) {
+                menorDistancia = distancia;
+                proximoPonto = pontosRestantes[i];
+                indexDoProximoPonto = i;
+            }
+        }
+
+        if (proximoPonto) {
+            rotaOtimizada.push(proximoPonto);
+            pontoAtual = proximoPonto;
+            pontosRestantes.splice(indexDoProximoPonto, 1);
+        } else {
+            // Caso de falha: Adiciona o restante dos pontos sem otimização
+            // Isso evita um loop infinito em casos de erro de cálculo
+            rotaOtimizada = rotaOtimizada.concat(pontosRestantes);
+            pontosRestantes = [];
+        }
+    }
+
+    return rotaOtimizada;
+}
+
+// A função 'calcularDistancia' permanece a mesma
+function calcularDistancia(ponto1, ponto2) {
+    const toRad = (valor) => (valor * Math.PI) / 180;
+    const lat1 = toRad(ponto1.lat);
+    const lon1 = toRad(ponto1.lng);
+    const lat2 = toRad(ponto2.lat);
+    const lon2 = toRad(ponto2.lng);
+    const R = 6371e3; // Raio da Terra em metros
+
+    const deltaLat = lat2 - lat1;
+    const deltaLon = lon2 - lon1;
+
+    const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+        Math.cos(lat1) * Math.cos(lat2) *
+        Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
 }
 
 function ordenarWaypointsPorProximidade(userLatLng, waypoints) {
@@ -456,33 +467,35 @@ function adicionarWaypoint(latlng) {
     }
 
     waypoints.push(latlng);
-
     const marker = L.marker(latlng).addTo(map);
-    marker.bindPopup(`
-        <b>Waypoint</b><br>
-        <button class="btn-remover">Remover</button>
-    `);
-    marker.on("popupopen", () => {
-        const btn = document.querySelector(".btn-remover");
-        if (btn) {
-            btn.onclick = () => {
-                removerWaypointPorCoordenada(latlng); // ✅ sempre por coordenada
-            };
-        }
-    });
-
     waypointMarkers.push(marker);
 
-    atualizarUrlComWaypoints();
+    // O código do pop-up será corrigido no próximo passo
+    marker.bindPopup(`<b>Waypoint</b><br><button onclick="removerWaypoint(${waypoints.length - 1})">Remover</button>`);
 
-    if (userMarker) {
-        waypoints = ordenarWaypointsPorProximidade(userMarker.getLatLng(), waypoints);
-        buscarERotear();
-    }
+    // A função de rota deve ser chamada aqui
+    buscarERotear();
+    atualizarUrlComWaypoints();
+}
+
+function atualizarURLWaypoints(waypoints) {
+    const url = new URL(window.location);
+    // Salva os waypoints como JSON no parâmetro "wps"
+    url.searchParams.set('wps', JSON.stringify(waypoints));
+    window.history.replaceState({}, '', url);
+}
+
+function obterWaypointsDoURL() {
+    const url = new URL(window.location);
+    const wps = url.searchParams.get('wps');
+    return wps ? JSON.parse(wps) : [];
 }
 
 function removerWaypoint(index, registrarHistorico = true) {
-    if (waypointMarkers[index]) map.removeLayer(waypointMarkers[index]);
+    if (waypointMarkers[index]) {
+        map.removeLayer(waypointMarkers[index]);
+    }
+
     const removido = waypoints[index];
     waypointMarkers.splice(index, 1);
     waypoints.splice(index, 1);
@@ -492,52 +505,101 @@ function removerWaypoint(index, registrarHistorico = true) {
         redoStack = [];
     }
 
-    atualizarUrlComWaypoints();
-
     if (rotaLayer) {
         map.removeLayer(rotaLayer);
         rotaLayer = null;
-        rotaPolyline = null;
     }
 
-    if (waypoints.length > 0 && userMarker) {
+    if (waypoints.length > 0) {
         buscarERotear();
-    } else if (!waypoints.length) {
+    } else {
         document.getElementById("qrcode-content").classList.add("esconder");
     }
+
+    atualizarUrlComWaypoints();
+
+    // ✅ O segredo para o botão de remoção funcionar
+    // Percorre todos os marcadores que sobraram e atualiza o popup deles
+    waypointMarkers.forEach((marker, newIndex) => {
+        marker.bindPopup(`
+            <b>Waypoint</b><br>
+            <button class="btn-remover-popup" data-index="${newIndex}">Remover</button>
+        `);
+        marker.on("popupopen", () => {
+            const btn = document.querySelector(".btn-remover-popup");
+            if (btn) {
+                btn.onclick = (e) => {
+                    const indexParaRemover = parseInt(e.target.dataset.index);
+                    removerWaypoint(indexParaRemover);
+                };
+            }
+        });
+    });
 }
 
-// Roteamento
-async function otimizarRota(waypoints) {
-    const body = {
-        jobs: waypoints.map((wp, i) => ({ id: i + 1, location: [wp.lng, wp.lat] })),
-        vehicles: [{ id: 1, profile: "driving-car", start: [userMarker.getLatLng().lng, userMarker.getLatLng().lat] }]
-    };
-
-    const res = await fetch("https://api.openrouteservice.org/v2/optimization", { // <-- sem 0.0.0.0
-        method: "POST",
-        headers: {
-            "Authorization": chave_api,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(body)
+function atualizarIndicesDosPopups() {
+    waypointMarkers.forEach((marker, index) => {
+        if (marker._popup) {
+            const novoPopupHtml = `
+                <b>Waypoint</b><br>
+                <button class="btn-remover-popup" data-index="${index}">Remover</button>
+            `;
+            marker.setPopupContent(novoPopupHtml);
+        }
     });
+}
 
-    if (!res.ok) {
-        throw new Error(`Erro na API: ${res.status}`);
+// Essa é a função que adiciona um waypoint e cria o pop-up
+// Na sua função adicionarWaypoint
+function adicionarWaypoint(latlng) {
+    if (waypoints.some(wp => wp.lat === latlng.lat && wp.lng === latlng.lng)) {
+        return;
     }
+    
+    // Adiciona o waypoint na lista
+    waypoints.push(latlng);
+    
+    // Cria o marcador e o adiciona no mapa e na lista de marcadores
+    const marker = L.marker(latlng).addTo(map);
+    waypointMarkers.push(marker);
 
-    const data = await res.json();
+    // Encontra o índice do waypoint recém-adicionado
+    const novoIndex = waypoints.findIndex(wp => wp.lat === latlng.lat && wp.lng === latlng.lng);
 
-    // A resposta da ORS Optimization traz a ordem de jobs em data.routes[0].steps
-    const ordemOtima = data.routes[0].steps.map(step => {
-        const job = body.jobs.find(j => j.id === step.job);
-        return { lat: job.location[1], lng: job.location[0] };
+    // Cria o pop-up com o botão de remover
+    marker.bindPopup(`
+        <b>Waypoint</b><br>
+        <button class="btn-remover-popup" data-index="${novoIndex}">Remover</button>
+    `);
+
+    // Adiciona o ouvinte de evento para o botão de remover
+    marker.on("popupopen", () => {
+        const btn = document.querySelector(".btn-remover-popup");
+        if (btn) {
+            btn.onclick = (e) => {
+                const indexParaRemover = parseInt(e.target.dataset.index);
+                removerWaypoint(indexParaRemover);
+            };
+        }
     });
 
-    return ordemOtima;
+    // Chama as funções para traçar a rota e atualizar a URL
+    buscarERotear();
+    atualizarUrlComWaypoints();
 }
 
+// Essa função já está correta, mas a chamamos no lugar certo agora.
+function atualizarUrlComWaypoints() {
+    const coordsString = waypoints.map(p => `${p.lat},${p.lng}`).join(';');
+    const novaUrl = new URL(window.location.href);
+    if (coordsString) {
+        novaUrl.searchParams.set('waypoints', coordsString);
+    } else {
+        novaUrl.searchParams.delete('waypoints');
+    }
+    window.history.replaceState({}, '', novaUrl);
+    gerarQRCode();
+}
 
 // Função para buscar as coordenadas de um endereço
 // ======= Geocoding robusto (Nominatim) =======
@@ -874,9 +936,9 @@ const origAddLayer = L.LayerGroup.prototype.addLayer;
 L.LayerGroup.prototype.addLayer = function(layer) {
   try {
     if (layer instanceof L.Polyline) {
-      console.log("Debug: uma polyline foi adicionada ao LayerGroup -> atualizando sugestão.");
-      // se proximaInstrucaoIndex e instrucoesRota existirem, tenta mostrar
-      if (typeof _postProcessarRotaLocal === "function") _postProcessarRotaLocal();
+        console.log("Debug: uma polyline foi adicionada ao LayerGroup -> atualizando sugestão.");
+        // se proximaInstrucaoIndex e instrucoesRota existirem, tenta mostrar
+        if (typeof _postProcessarRotaLocal === "function") _postProcessarRotaLocal();
     }
   } catch (e) { /* ignore */ }
   return origAddLayer.call(this, layer);
