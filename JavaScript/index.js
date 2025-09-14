@@ -365,6 +365,32 @@ function atualizarRotaRestante(pontos, index) {
 
 // --------- Funções de Waypoints e UI ---------
 
+// Desfaz a última adição do Waypoint
+function desfazerWaypoint() {
+    if (undoStack.length === 0) return;
+    const acao = undoStack.pop();
+    redoStack.push(acao);
+
+    if (acao.tipo === "add") {
+        removerWaypoint(waypoints.findIndex(wp => latLngEquals(wp, acao.latlng)), false);
+    } else if (acao.tipo === "remove") {
+        adicionarWaypoint(acao.latlng, false);
+    }
+}
+
+// Refaz a última adição do Waypoint
+function refazerWaypoint() {
+    if (redoStack.length === 0) return;
+    const acao = redoStack.pop();
+    undoStack.push(acao);
+
+    if (acao.tipo === "add") {
+        adicionarWaypoint(acao.latlng, false);
+    } else if (acao.tipo === "remove") {
+        removerWaypoint(waypoints.findIndex(wp => latLngEquals(wp, acao.latlng)), false);
+    }
+}
+
 // Atalhos de teclado para desfazer/refazer waypoint
 document.addEventListener('keydown', function (e) {
     if (e.ctrlKey && e.key.toLowerCase() === 'z') desfazerWaypoint();
@@ -406,23 +432,29 @@ function reordenarWaypointsOtimizada(listaWaypoints) {
 
 // Atualiza URL com waypoints e gera QR Code
 function atualizarUrlComWaypoints() {
-    const coordsString = waypoints.map(p => `${p.lat},${p.lng}`).join(';');
     const novaUrl = new URL(window.location.href);
-    if (coordsString) novaUrl.searchParams.set('waypoints', coordsString);
-    else novaUrl.searchParams.delete('waypoints');
+    novaUrl.searchParams.delete('waypoints'); // Limpa os parâmetros existentes para evitar duplicatas
+
+    waypoints.forEach(p => {
+        novaUrl.searchParams.append('waypoints', `${p.lat},${p.lng}`);
+    });
+
     window.history.replaceState({}, '', novaUrl);
     gerarQRCode();
-}
+}   
 
 // Carrega waypoints da URL
 function carregarWaypointsDaUrl() {
     const params = new URLSearchParams(window.location.search);
-    const coordsString = params.get('waypoints') || params.get('wps');
-    if (!coordsString) return;
-    const coordsArray = coordsString.split(';').map(s => s.trim()).filter(Boolean);
+    const coordsArray = params.getAll('waypoints');
+
+    if (!coordsArray || coordsArray.length === 0) return;
+
     coordsArray.forEach(coord => {
         const [lat, lng] = coord.split(',').map(Number);
-        if (!isNaN(lat) && !isNaN(lng)) adicionarWaypoint({lat, lng});
+        if (!isNaN(lat) && !isNaN(lng)) {
+            adicionarWaypoint({lat, lng});
+        }
     });
 }
 
@@ -439,7 +471,7 @@ function gerarQRCode() {
 }
 
 // Adiciona um waypoint no mapa e atualiza UI
-function adicionarWaypoint(latlng) {
+function adicionarWaypoint(latlng, registrarHistorico = true) {
     const p = { lat: Number(latlng.lat), lng: Number(latlng.lng) };
     if (waypoints.some(wp => latLngEquals(wp, p))) return;
 
@@ -465,8 +497,12 @@ function adicionarWaypoint(latlng) {
         }
     });
 
-    if (userMarker) buscarERotear();
+    if (registrarHistorico) {
+        undoStack.push({ tipo: "add", latlng: p });
+        redoStack = [];
+    }
 
+    if (userMarker) buscarERotear();
     atualizarUrlComWaypoints();
 }
 
@@ -478,6 +514,11 @@ function removerWaypoint(index, registrarHistorico = true) {
     if (marker && map.hasLayer(marker)) map.removeLayer(marker);
     waypointMarkers.splice(index, 1);
     waypoints.splice(index, 1);
+
+    if (registrarHistorico) {
+      undoStack.push({ tipo: "remove", latlng: removido, index });
+      redoStack = [];
+    }
 
     if (registrarHistorico) { undoStack.push({ tipo: "remove", latlng: removido, index }); redoStack = []; }
 

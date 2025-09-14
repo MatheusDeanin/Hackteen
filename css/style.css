@@ -125,6 +125,7 @@ input#endereco {
 
 /* --- Menu de Links --- */
 .textomenu {
+    text-align: center;
     padding-top: 3px;
 }
 
@@ -192,28 +193,6 @@ input#endereco {
 
 #overlay.visivel {
     display: block;
-}
-
-/* --- Sugestão de Rota --- */
-#sugestao-virada {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: rgba(0, 0, 0, 0.8);
-    color: #fff;
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-size: 14px;
-    max-width: 250px;
-    z-index: 999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-}
-
-#sugestao-virada.esconder {
-    display: none;
 }
 
 /* --- Sidebar --- */
