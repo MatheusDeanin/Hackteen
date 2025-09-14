@@ -1,31 +1,37 @@
+/* Importa a fonte Montserrat do Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
 
+/* Reset básico de margens e padding para todos os elementos */
 * {
     margin: 0;
     padding: 0;
 }
 
-body{
-    font-family:'Montserrat', sans-serif;
-    background-color: rgb(248, 255, 239);
-    color: white;
+/* Estilo principal do body */
+body {
+    font-family: 'Montserrat', sans-serif;
+    background-color: rgb(248, 255, 239); /* Fundo principal */
+    color: white; /* Cor padrão do texto */
 }
 
+/* Cabeçalho */
 header {
     background-color: #2c3e50;
-    align-items: center;
-    position: relative;
-    z-index: 2;
+    display: flex; /* Layout flexível */
+    justify-content: space-between; /* Espaço entre itens */
+    align-items: center; /* Centraliza verticalmente */
     padding: 30px;
-    display: flex;
-    justify-content: space-between;
+    position: relative;
+    z-index: 2; /* Sobreposição */
 }
 
+/* Logo no header */
 header img {
     width: 30px;
     height: auto;
 }
 
+/* Links do menu principal */
 .textomenu a {
     font-family: 'Montserrat', sans-serif;
     color: white;
@@ -33,44 +39,51 @@ header img {
     text-decoration: none;
 }
 
-.textoinicial h1{
+/* Título principal da seção inicial */
+.textoinicial h1 {
     color: white;
     text-align: center;
     font-size: 45px;
-    font-family:'Montserrat', sans-serif;
+    font-family: 'Montserrat', sans-serif;
 }
 
-p{
+/* Parágrafos gerais */
+p {
     font-size: 20px;
     font-family: 'Montserrat', sans-serif;
-    
 }
 
-.textoinicial{
+/* Seção inicial com background e camada escura */
+.textoinicial {
     background: 
-        linear-gradient(rgba(0, 0, 0, 0.425), rgba(0, 0, 0, 0.425)), /* camada escura */
-        url("Background.png") no-repeat center center fixed;
+        linear-gradient(rgba(0, 0, 0, 0.425), rgba(0, 0, 0, 0.425)), /* Camada escura */
+        url("../imagens/Background.png") no-repeat center center fixed;
     background-size: cover;
     padding-bottom: 10px;
 }
 
+/* Container de imagem e texto lado a lado */
 .texto-imagem {
     display: flex;
 }
 
+/* Logo grande dentro da seção inicial */
 .logo {
     width: 450px;
     height: 450px;
 }
 
+/* Margem para parágrafos na seção inicial */
 .textoinicial p {
     margin: 20px;
 }
 
+/* Seção de uso do produto, layout flexível */
 .utilizacao {
     display: flex;
 }
 
+/* Título de produtos/seções com destaque */
 .produto h1 {
     text-decoration: underline;
     padding-bottom: 15px;
@@ -78,18 +91,21 @@ p{
     color: #2c3e50;
 }
 
+/* Imagens do produto com sombras e bordas arredondadas */
 .produto img {
     box-shadow: 0px 2px 2px 2px rgba(0, 0, 0, 0.267);
     margin: 18px;
     border-radius: 0px 22px 22px 22px;
 }
 
+/* Parágrafos dentro da seção produto */
 .produto p {
     align-items: center;
     margin-top: 18px;
     color: rgb(0, 0, 0);
 }
 
+/* Título Changelog */
 .Changelog {
     text-align: center;
     font-size: 60px;
@@ -98,22 +114,26 @@ p{
     color: rgb(6, 187, 0);
 }
 
-.mapa{
+/* Containers de mapa e botões */
+.mapa {
     display: flex;
     justify-content: center;
     gap: 20px;
 }
 
+/* Subtítulos dentro de "acesse" */
 .acesse h1 {
     font-family: 'Montserrat', sans-serif;
     padding: 6px;
     color: #2c3e50;
 }
 
-.acesse{
+/* Container de "acesse" */
+.acesse {
     text-align: center;
 }
 
+/* Botões gerais */
 button {
     cursor: pointer;
     border-radius: 10%;
@@ -127,60 +147,75 @@ button {
     transition: transform 0.5s ease;
 }
 
+/* Efeito hover nos botões */
 button:hover {
     transform: scale(1.1);
 }
 
+/* Estilo de títulos de bugs */
 .bugs {
     padding-top: 6px;
     color: rgb(6, 187, 0);
 }
 
+/* Parágrafos dentro de correções */
 .correcoes p {
     padding-left: 20px;
     color: black;
 }
 
+/* Linha horizontal */
 hr {
     width: 60%;
     justify-self: center;
     margin-bottom: 30px;
 }
 
+/* Responsividade para telas menores que 600px */
 @media (max-width: 600px) {
+
+    /* Seção de utilização */
     .utilizacao {
         padding: 20px;
         justify-content: center;
         display: block;
     }
 
+    /* Imagem de celular */
     .utilizacao .celular {
         width: 300px;
         justify-items: center;
     }
 
+    /* Container de texto e imagem */
     .texto-imagem {
         display: block;
         height: 760px;
     }
 
+    /* Ajuste para campo de pesquisa */
     .pesquisa {
         margin-left: 50%;
     }
 
+    /* Logo pequena */
     .logo {
         padding-left: 45%;
         width: 40px;
         height: 40px;
     }
+
+    /* Container de mapas em bloco */
     .mapa {
         display: block;
     }
 
+    /* Linha horizontal mais larga */
     hr {
         width: 75%;
     }
 
+    /* Centraliza textos de bugs */
     .bugs {
         text-align: center;
     }

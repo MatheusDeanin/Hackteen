@@ -1,16 +1,20 @@
+/* --- Fonte Global --- */
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
 
+/* --- Reset Básico --- */
 * {
     margin: 0;
     padding: 0;
-    box-sizing: border-box; /* Adicionado para melhor controle de layout */
+    box-sizing: border-box; /* Melhor controle de layout */
 }
 
+/* --- Corpo da Página --- */
 body {
     font-family: 'Montserrat', sans-serif;
     margin: 0;
 }
 
+/* --- Cabeçalho --- */
 header {
     display: flex;
     justify-content: space-between;
@@ -21,9 +25,8 @@ header {
     z-index: 2;
 }
 
+/* --- Botões do Menu --- */
 .menu {
-    width: 150px;
-    box-shadow: 2px 2px 2px 0px rgba(0, 0, 0, 0.582);
     width: 70px;
     height: 40px;
     border: 2px solid rgb(124, 124, 124);
@@ -32,6 +35,7 @@ header {
     color: white;
     margin: 5px;
     background-color: #326da8;
+    box-shadow: 2px 2px 2px 0px rgba(0, 0, 0, 0.582);
     transition: transform 0.5s ease;
 }
 
@@ -39,6 +43,7 @@ header {
     transform: scale(1);
 }
 
+/* --- Formulário e Input --- */
 #form-container {
     display: flex;
     align-items: center;
@@ -48,21 +53,20 @@ header {
     padding: 0;
     background: transparent;
     border-radius: 0;
+    position: relative; /* Necessário para dropdown absoluto */
 }
-
 
 input#endereco {
     padding: 10px;
     margin-right: 10px;
     transform: translateY(-7px);
-
 }
 
-/* --- Últimas pesquisas e sugestões --- */
+/* --- Dropdown de Sugestões --- */
 #sugestoes-ultimas, #sugestoes-proximas {
     margin-top: 5px;
     display: flex;
-    flex-direction: column; /* fica em coluna para dropdown */
+    flex-direction: column; /* Coluna para dropdown */
     gap: 5px;
     background: #f9f9f9;
     border-radius: 5px;
@@ -71,8 +75,8 @@ input#endereco {
     overflow-y: auto;
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     position: absolute;
-    z-index: 1006; /* acima do mapa */
-    width: 300px; /* largura similar ao input */
+    z-index: 1006;
+    width: 300px; /* Similar ao input */
 }
 
 #sugestoes-ultimas button, #sugestoes-proximas button {
@@ -91,9 +95,22 @@ input#endereco {
     background-color: #1d63b0;
 }
 
-/* Posicionamento do container relativo ao input */
-#form-container {
-    position: relative; /* necessário para o dropdown absoluto */
+/* --- Botões Globais --- */
+.Buscar {
+    width: 91px;
+    height: 40px;
+    border: 2px solid rgb(124, 124, 124);
+    margin-top: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+    color: white;
+    background-color: #4e7aa3;
+    box-shadow: 2px 2px 2px 0px rgba(76, 129, 189, 0.582);
+    transition: transform 0.5s ease;
+}
+
+.Buscar:hover {
+    transform: scale(1.1);
 }
 
 .btn-sugestao {
@@ -106,6 +123,7 @@ input#endereco {
     font-size: 0.85em;
 }
 
+/* --- Menu de Links --- */
 .textomenu {
     padding-top: 3px;
 }
@@ -117,40 +135,18 @@ input#endereco {
     text-decoration: none;
 }
 
-.Buscar {
-    width: 150px;
-}
-
-/* --- Estilos de Botões Globais --- */
-.Buscar {
-    box-shadow: 2px 2px 2px 0px rgba(76, 129, 189, 0.582);
-    width: 91px;
-    height: 40px;
-    border: 2px solid rgb(124, 124, 124);
-    margin-top: 5px;
-    border-radius: 5px;
-    cursor: pointer;
-    color: white;
-
-    background-color: #4e7aa3;
-    transition: transform 0.5s ease;
-}
-
-.Buscar:hover {
-    transform: scale(1.1);
-}
-
-/* --- Mapa e Overlays --- */
+/* --- Mapa --- */
 #map {
     height: 85vh;
 }
 
+/* --- Tela de Carregamento --- */
 #tela-carregamento {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
-    background-color: rgba(55, 75, 94, 0.8); /* Corrigido para um valor mais opaco */
+    background-color: rgba(55, 75, 94, 0.8);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -182,6 +178,7 @@ input#endereco {
     100% { transform: rotate(360deg); }
 }
 
+/* --- Overlay --- */
 #overlay {
     position: fixed;
     top: 0;
@@ -229,12 +226,11 @@ input#endereco {
     background-color: #34495e;
     overflow-x: hidden;
     transition: 0.3s;
-    z-index: 9999; /* z-index ajustado para um valor mais seguro */
+    z-index: 9999;
 }
 
 #sidebar.aberto {
     left: 0;
-
 }
 
 #sidebar h1 {
@@ -246,12 +242,9 @@ input#endereco {
 
 #sidebar p {
     font-family: 'Montserrat', sans-serif;
-    text-decoration: none;
     font-size: 18px;
     color: white;
     display: flex;
-    transition: none;
-    animation: none;
     padding: 12px 20px;
     height: 50px;
     width: 400px;
@@ -261,33 +254,32 @@ input#endereco {
     background-color: #3e5b76;
 }
 
-/* --- Estilos para o QR Code Retrátil --- */
-/* Estilos para o QR Code Retrátil */
+/* --- QR Code Retrátil --- */
 #qrcode-container {
     position: fixed;
     bottom: 80px;
     right: 20px;
-    width: 60px; /* Largura inicial */
-    height: 60px; /* Altura inicial */
+    width: 60px;
+    height: 60px;
     background: #34495e;
     color: #fff;
-    border-radius: 50%; /* Faz com que o botão inicial seja redondo */
+    border-radius: 50%;
     z-index: 1000;
-    overflow: hidden; /* Esconde o conteúdo que transborda */
-    transition: width 0.3s ease, height 0.3s ease, border-radius 0.3s ease;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    transition: width 0.3s ease, height 0.3s ease, border-radius 0.3s ease;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 #qrcode-container.aberto {
     padding-bottom: 50px;
-    width: 250px; /* Largura expandida */
-    height: 380px; /* Altura expandida */
-    border-radius: 8px; /* Cantos quadrados quando expandido */
-    background: #fff; /* Fundo branco para o QR Code */
+    width: 250px;
+    height: 380px;
+    border-radius: 8px;
+    background: #fff;
     color: #333;
 }
 
@@ -296,10 +288,8 @@ input#endereco {
 }
 
 #qrcode-expander {
-    /* **Ajustes feitos aqui:** */
     width: 100%;
     height: 100%;
-    padding: 0;
     padding-top: 60px;
     margin: 0;
     background: transparent;
@@ -308,15 +298,14 @@ input#endereco {
     font-weight: bold;
     font-size: 1.2em;
     cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     transition: opacity 0.3s ease;
-    /* Adicionado para centralizar o texto "QR" */
-    display: flex; /* Transforma em flex container */
-    justify-content: center; /* Centraliza horizontalmente */
-    align-items: center; /* Centraliza verticalmente */
 }
 
 #qrcode-container.aberto #qrcode-expander {
-    opacity: 0; /* Esconde o botão quando expandido */
+    opacity: 0;
     pointer-events: none;
 }
 
@@ -328,12 +317,12 @@ input#endereco {
     gap: 15px;
     width: 100%;
     height: 100%;
-    transform: scale(0); /* Esconde o conteúdo inicialmente */
+    transform: scale(0);
     transition: transform 0.3s ease;
 }
 
 #qrcode-container.aberto #qrcode-content {
-    transform: scale(1); /* Mostra o conteúdo quando expandido */
+    transform: scale(1);
 }
 
 #qrcode-content h3 {
@@ -347,6 +336,7 @@ input#endereco {
     cursor: pointer;
 }
 
+/* --- Responsividade --- */
 @media (max-width: 600px) {
     header {
         display: block;
@@ -365,6 +355,7 @@ input#endereco {
     #form-container {
         background: none;
         padding-left: 7%;
+        margin-left: 5%;
     }
 
     input#endereco {
@@ -373,10 +364,6 @@ input#endereco {
 
     #botaoMenu {
         margin-left: 37%;
-    }
-
-    #form-container {
-        margin-left: 5%;
     }
 
     #sugestoes-ultimas, #sugestoes-proximas {
