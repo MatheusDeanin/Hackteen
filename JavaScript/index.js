@@ -63,9 +63,8 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // Carrega waypoints da URL e atualiza sugestões
+    // Carrega waypoints da URL
     carregarWaypointsDaUrl();
-    atualizarSugestoes();
 });
 
 // Configuração da chave da API
@@ -169,25 +168,6 @@ function salvarUltimaPesquisa(endereco) {
     ultimas.unshift(endereco);
     ultimas = ultimas.slice(0, 3); // mantém últimas 3 pesquisas
     localStorage.setItem("ultimasPesquisas", JSON.stringify(ultimas));
-    atualizarSugestoes();
-}
-
-// Atualiza sugestões na interface
-function atualizarSugestoes() {
-    const ultimas = JSON.parse(localStorage.getItem("ultimasPesquisas")) || [];
-    const container = document.getElementById("sugestoes-ultimas");
-    if (!container) return;
-    container.innerHTML = "";
-    ultimas.forEach(endereco => {
-        const btn = document.createElement("button");
-        btn.className = "btn-sugestao";
-        btn.innerText = endereco;
-        btn.onclick = () => {
-            document.getElementById("endereco").value = endereco;
-            adicionarEndereco();
-        };
-        container.appendChild(btn);
-    });
 }
 
 // Animação de movimentação suave de marcador
@@ -486,7 +466,6 @@ function adicionarWaypoint(latlng) {
     });
 
     if (userMarker) buscarERotear();
-    else mostrarSugestao("Aguardando sua localização para traçar a rota...");
 
     atualizarUrlComWaypoints();
 }
