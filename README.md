@@ -1,53 +1,64 @@
-# Projeto: DriveGood
-# Hackteen - Projeto Empresa Venturus Campinas-SP
-# Etec Rodrigues de Abreu
+# 🚗 DriveGood  
+### Hackteen - Projeto Empresa Venturus Campinas-SP  
+### Etec Rodrigues de Abreu  
 
-**Participantes:** [Matheus Jordão](https://github.com/MatheusJordao12/); [Matheus Deanin](https://github.com/MatheusDeanin/); [Julia](); [Lucas](https://github.com/LcsGomes-AMS/).
-
-Projeto feito pelo os alunos do 1ºAMS - ETEC/FATEC, para o Hackteen.
-<br>
-A DriveGood é uma aplicação web que permite ao usuário inserir um destino final e diversos pontos de parada.  
-A plataforma então calcula o **trajeto mais eficiente**, utilizando algoritmos de otimização de rotas. Ideal para motoristas, entregadores e qualquer pessoa que precisa realizar múltiplas tarefas durante o deslocamento.
-Apps de navegação comuns traçam rotas entre dois pontos, mas não oferecem uma otimização real quando o usuário precisa passar por **vários lugares antes de chegar ao destino**. Isso gera:
-
-- Perda de tempo
-- Gasto excessivo de combustível
-- Estresse com o trânsito ou rotas ineficientes
-
-Para utilizar, basta o usuário informar:
-
-1. Seu destino final
-2. Os pontos intermediários (paradas)
-3. E recebe uma **rota otimizada**, com a ordem ideal das paradas
-
-No **backend** foi usado API OpenRouteService e linguagem HTML, CSS e JavaScript
-
-
- Documentação da API – OpenRouteService
-
-Este projeto utiliza a **OpenRouteService API** para fornecer funcionalidades de roteamento, otimização de múltiplas paradas e geocodificação de endereços.
-
-[🔗 Site oficial da API](https://openrouteservice.org/dev/#/api-docs)
+**Participantes:**  
+- [Matheus Jordão](https://github.com/MatheusJordao12/)  
+- [Matheus Deanin](https://github.com/MatheusDeanin/)  
+- [Julia](https://github.com/JuliaDias0109)
+- [Lucas](https://github.com/LcsGomes-AMS/)  
 
 ---
 
-Autenticação
+## 📖 Sobre o Projeto
+O **DriveGood** é uma aplicação web desenvolvida pelos alunos do **1ºAMS - ETEC/FATEC** durante o Hackteen.  
 
-Para usar a API, você precisa de uma chave (API Key).  
-Você pode obter uma gratuitamente em:
+A proposta é simples e eficiente: ajudar motoristas, entregadores e qualquer pessoa que precise realizar **múltiplas paradas** no trajeto, garantindo o **menor tempo e custo possível**.  
 
- https://openrouteservice.org/dev/#/signup
+Diferente de apps de navegação comuns, que apenas traçam rotas entre dois pontos, o DriveGood utiliza **algoritmos de otimização de rotas** para definir a ordem mais inteligente das paradas, reduzindo:  
 
-Todas as requisições precisam incluir esse cabeçalho:
+- ⏱️ Tempo de deslocamento  
+- ⛽ Consumo de combustível  
+- 😵‍💫 Estresse com rotas ineficientes  
 
-```http
-Authorization: your_api_key
-Content-Type: application/json
-```
 ---
-**Vídeo de apresentação**
 
+## ⚙️ Como Funciona
+1. O usuário informa o **destino final**  
+2. Adiciona os **pontos de parada intermediários**  
+3. O sistema calcula a **rota otimizada**, com a sequência ideal das paradas  
 
+---
+
+## 🛠️ Tecnologias Utilizadas
+- **Frontend:** HTML, CSS e JavaScript  
+- **Backend/Rotas:** [OpenRouteService API](https://openrouteservice.org/dev/#/api-docs)  
+
+---
+
+## 🌍 OpenRouteService API
+O projeto utiliza a **OpenRouteService API** para:  
+- Roteamento e cálculo de trajetos  
+- Otimização de múltiplas paradas  
+- Geocodificação de endereços  
+
+🔑 Para utilizar, é necessário gerar uma **API Key gratuita**:  
+👉 [Cadastro aqui](https://openrouteservice.org/dev/#/signup)  
+
+---
+
+## 🎥 Vídeo de Apresentação
 https://github.com/user-attachments/assets/bb7a024b-843b-40de-b672-3614a7a33dcf
 
+---
 
+## 🚀 Futuras Melhorias
+- Integração com mapas interativos (Leaflet/Mapbox)  
+- Suporte a diferentes perfis de rota (carro, bicicleta, pedestre)  
+- Interface mobile responsiva  
+
+---
+
+## 📌 Conclusão
+O **DriveGood** mostra como a tecnologia pode tornar o deslocamento urbano mais **eficiente, econômico e prático**.  
+É uma solução pensada para quem precisa **ganhar tempo e reduzir custos**, sem complicação.  
