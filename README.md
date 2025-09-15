@@ -53,9 +53,8 @@ https://github.com/user-attachments/assets/bb7a024b-843b-40de-b672-3614a7a33dcf
 ---
 
 ## 🚀 Futuras Melhorias
-- Integração com mapas interativos (Leaflet/Mapbox)  
+- Pesquisa aprimorada 
 - Suporte a diferentes perfis de rota (carro, bicicleta, pedestre)  
-- Interface mobile responsiva  
 
 ---
 
