@@ -41,9 +41,9 @@ header img {
 
 /* Links dentro do container .nomes */
 .nomes a {
-    font-size: 25px;
+    font-size: 55px;
     font-weight: bold;
-    color: rgb(10, 14, 238);
+    color: rgb(49, 49, 49);
     text-decoration: none;
 }
 
@@ -68,7 +68,7 @@ h2 {
 /* Títulos h1 */
 h1 {
     color: #000000;
-    padding-top: 30px;
+    padding-top: 45px;
 }
 
 /* Tabela */
@@ -78,6 +78,8 @@ table {
 
 /* SVGs gerais */
 svg {
+    width: 100px;
+    height: auto;
     display: flex;
     padding: 15px;
 }

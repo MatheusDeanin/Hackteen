@@ -109,8 +109,10 @@ p {
 .Changelog {
     text-align: center;
     font-size: 60px;
+    font-weight: bold;
+    text-decoration: none;
     font-family: 'Montserrat', sans-serif;
-    padding: 6px;
+    padding-left: 28%;
     color: rgb(6, 187, 0);
 }
 
