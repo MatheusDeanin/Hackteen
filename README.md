@@ -47,6 +47,7 @@ Content-Type: application/json
 ---
 **Vídeo de apresentação**
 
-https://github.com/user-attachments/assets/eaf287c9-1c02-4627-ac8b-af44c9c85783
+
+https://github.com/user-attachments/assets/bb7a024b-843b-40de-b672-3614a7a33dcf
 
 
