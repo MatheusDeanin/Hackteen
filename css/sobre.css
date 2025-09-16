@@ -175,7 +175,11 @@ hr {
 
 /* Responsividade para telas menores que 600px */
 @media (max-width: 600px) {
-
+    /* Atualização */
+    .Changelog {
+        padding-left: 7%;
+        font-size: 30px;
+    }
     /* Seção de utilização */
     .utilizacao {
         padding: 20px;
@@ -192,7 +196,7 @@ hr {
     /* Container de texto e imagem */
     .texto-imagem {
         display: block;
-        height: 760px;
+        height: auto;
     }
 
     /* Ajuste para campo de pesquisa */
