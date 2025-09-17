@@ -48,7 +48,7 @@ O projeto utiliza a **OpenRouteService API** para:
 ---
 
 ## 🎥 Vídeo de Apresentação
-https://github.com/user-attachments/assets/bb7a024b-843b-40de-b672-3614a7a33dcf
+https://drive.google.com/file/d/1l32tn5Q7lvowpCLzJKSb9CsoznTuzdMf/view?usp=sharing
 
 ---
 
