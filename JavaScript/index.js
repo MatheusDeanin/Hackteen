@@ -463,12 +463,25 @@ function carregarWaypointsDaUrl() {
 function gerarQRCode() {
     const qrcodeElement = document.getElementById("qrcode");
     const content = document.getElementById("qrcode-content");
-    if (qrcodeElement && content) {
-        qrcodeElement.innerHTML = '';
-        new QRCode(qrcodeElement, window.location.href);
-        content.classList.remove("esconder");
-    }
+
+    if (!qrcodeElement || !content) return;
+
+    qrcodeElement.innerHTML = "";
+
+    const shareUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+
+    new QRCode(qrcodeElement, {
+        text: shareUrl,
+        width: 220,
+        height: 220,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+    });
+
+    content.classList.remove("esconder");
 }
+
 
 // Adiciona um waypoint no mapa e atualiza UI
 function adicionarWaypoint(latlng, registrarHistorico = true) {
@@ -483,8 +496,8 @@ function adicionarWaypoint(latlng, registrarHistorico = true) {
     marker.bindPopup(`<b>Waypoint</b><br><button class="btn-remover-popup" data-index="${novoIndex}">Remover</button>`);
 
     marker.on("popupopen", (e) => {
-        const btn = e.popup.getElement().querySelector(`[data-index="${novoIndex}"]`);
-        if (btn) btn.onclick = (e) => removerWaypoint(parseInt(e.target.dataset.index));
+    const btn = e.popup.getElement().querySelector(`[data-index="${novoIndex}"]`);
+    if (btn) btn.onclick = (e) => removerWaypoint(parseInt(e.target.dataset.index), true); // Adicione `true` para registrar no histórico
     });
 
     marker.on("dragend", function() {
@@ -509,25 +522,37 @@ function adicionarWaypoint(latlng, registrarHistorico = true) {
 // Remove waypoint selecionado e atualiza rota e histórico
 function removerWaypoint(index, registrarHistorico = true) {
     if (index < 0 || index >= waypoints.length) return;
+
     const removido = waypoints[index];
     const marker = waypointMarkers[index];
-    if (marker && map.hasLayer(marker)) map.removeLayer(marker);
+
+    if (marker && map.hasLayer(marker)) {
+        map.removeLayer(marker);
+    }
+
     waypointMarkers.splice(index, 1);
     waypoints.splice(index, 1);
 
     if (registrarHistorico) {
-      undoStack.push({ tipo: "remove", latlng: removido, index });
-      redoStack = [];
+        undoStack.push({ tipo: "remove", latlng: removido, originalIndex: index });
+        redoStack = [];
     }
 
-    if (registrarHistorico) { undoStack.push({ tipo: "remove", latlng: removido, index }); redoStack = []; }
+    if (rotaLayer) {
+        map.removeLayer(rotaLayer);
+        rotaLayer = null;
+        rotaPolyline = null;
+    }
 
-    if (rotaLayer) { map.removeLayer(rotaLayer); rotaLayer = null; rotaPolyline = null; }
-    if (waypoints.length > 0 && userMarker) buscarERotear();
-    else document.getElementById("qrcode-content")?.classList.add("esconder");
+    if (waypoints.length > 0 && userMarker) {
+        buscarERotear();
+    } else {
+        document.getElementById("qrcode-content")?.classList.add("esconder");
+    }
 
     atualizarUrlComWaypoints();
 }
+
 
 // Consulta coordenadas de um endereço usando Nominatim
 function buscarCoordenadas(endereco) {
